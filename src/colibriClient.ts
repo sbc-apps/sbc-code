@@ -84,7 +84,7 @@ export class SseDecoder {
     const lines = event.split(/\r\n|\r|\n/);
     const data = lines
       .filter((line) => line === 'data' || line.startsWith('data:'))
-      .map((line) => line.slice(4).replace(/^ /, ''));
+      .map((line) => line === 'data' ? '' : line.slice(5).replace(/^ /, ''));
     return data.length ? data.join('\n') : undefined;
   }
 }
