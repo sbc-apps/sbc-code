@@ -1,8 +1,8 @@
 {
   "name": "sbc-code",
   "displayName": "SBC Code",
-  "description": "Local-first VS Code AI coding agent with explicit file context, reviewable edits, reversible checkpoints and model tools.",
-  "version": "0.3.0",
+  "description": "Local-first VS Code AI coding agent with exact patch edits, bounded source reads, reviewed file changes and Colibri models.",
+  "version": "0.4.0",
   "publisher": "sbc-apps",
   "license": "UNLICENSED",
   "private": true,

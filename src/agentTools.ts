@@ -4,6 +4,8 @@ import { promises as fs } from 'node:fs';
 import { spawn } from 'node:child_process';
 import type { ToolCall } from './agentTypes';
 import { EditCheckpoints } from './editCheckpoints';
+import { applyExactPatches, ExactPatchHunk } from './exactPatches';
+import { selectSourceWindow } from './sourceWindow';
 import { isRestrictedFile, resolveWorkspaceFile } from './workspacePaths';
 
 export const AGENT_TOOLS = [
@@ -36,11 +38,56 @@ export const AGENT_TOOLS = [
     type: 'function',
     function: {
       name: 'read_file',
-      description: 'Read a text file from the VS Code workspace, excluding secrets and hidden configuration.',
+      description: 'Read a workspace source file, excluding secrets. For large files use start_line and end_line (1-based) to read only a small window; the result reports total_lines. Full reads are capped at 18k characters.',
       parameters: {
         type: 'object',
-        properties: { path: { type: 'string', description: 'Workspace-relative path.' } },
+        properties: {
+          path: { type: 'string', description: 'Workspace-relative path.' },
+          start_line: { type: 'integer', minimum: 1, description: 'Optional first source line (1-based); supply end_line too.' },
+          end_line: { type: 'integer', minimum: 1, description: 'Optional last source line (inclusive); supply start_line too.' },
+        },
         required: ['path'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'propose_patch',
+      description: 'Prefer this for targeted code changes. For 1–4 previously read files, replace exact, unique source snippets. Supports up to 8 non-overlapping find/replace hunks per file. Never send full file content. Each change opens a VS Code diff and requires user approval before applying.',
+      parameters: {
+        type: 'object',
+        properties: {
+          changes: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 4,
+            items: {
+              type: 'object',
+              properties: {
+                path: { type: 'string', description: 'Workspace-relative path of an existing, previously read source file.' },
+                patches: {
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 8,
+                  items: {
+                    type: 'object',
+                    properties: {
+                      find: { type: 'string', description: 'Exact original code snippet, including line breaks and indentation. Must occur once in that file.' },
+                      replace: { type: 'string', description: 'Replacement source snippet; empty string deletes the matched snippet.' },
+                    },
+                    required: ['find', 'replace'],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ['path', 'patches'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['changes'],
         additionalProperties: false,
       },
     },
@@ -201,7 +248,9 @@ function runProcess(binary: string, args: readonly string[], cwd: string, signal
 
 export class AgentTools {
   private readonly preview = new PreviewTextProvider();
-  private readonly readFiles = new Set<string>();
+  // Only read source that belongs to the current Agent turn may be edited.
+  // Keep returned windows and document versions to avoid stale or unseen edits.
+  private readonly readFiles = new Map<string, Array<{ text: string; version: number; complete: boolean }>>();
 
   constructor(context: vscode.ExtensionContext, private readonly checkpoints: EditCheckpoints) {
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(PREVIEW_SCHEME, this.preview));
@@ -238,6 +287,8 @@ export class AgentTools {
           return await this.readFile(root, args);
         case 'propose_edits':
           return await this.proposeEdits(root, args, signal);
+        case 'propose_patch':
+          return await this.proposePatch(root, args, signal);
         case 'run_checks':
           return await this.runChecks(root, args, signal);
         default:
@@ -302,21 +353,87 @@ export class AgentTools {
     const relative = requireString(args.path, 'path', 400);
     const filename = await resolveWorkspaceFile(root, relative, false);
     const stats = await fs.stat(filename);
-    if (!stats.isFile() || stats.size > MAX_READ_BYTES) {
-      throw new Error('File is not regular text or is too large (48 KiB limit).');
+    if (!stats.isFile() || stats.size > 512 * 1024) {
+      throw new Error('File is not regular text or is too large (512 KiB limit).');
     }
-    const contents = await fs.readFile(filename, 'utf8');
-    if (contents.includes('\0')) {
-      throw new Error('Binary file refused.');
+    // Include unsaved editor changes, not just the last saved filesystem contents.
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filename));
+    const contents = document.getText();
+    const start = args.start_line;
+    const end = args.end_line;
+    if ((start !== undefined && typeof start !== 'number') ||
+        (end !== undefined && typeof end !== 'number')) {
+      throw new Error('start_line and end_line must be integers.');
     }
-    if (contents.length > 18000) {
-      throw new Error('File is too long for reliable agent edits. Narrow the request or use Edit Selection.');
-    }
-    this.readFiles.add(path.resolve(filename));
-    return JSON.stringify({ path: relative, content: contents.slice(0, 18000), truncated: contents.length > 18000 });
+    const window = selectSourceWindow(contents, start as number | undefined, end as number | undefined);
+    const absolute = path.resolve(filename);
+    const previous = this.readFiles.get(absolute) ?? [];
+    previous.push({ text: window.content, version: document.version, complete: window.complete });
+    this.readFiles.set(absolute, previous.slice(-16));
+    return JSON.stringify({ path: relative, ...window });
   }
 
-  private async proposeEdits(root: string, args: Record<string, unknown>, signal: AbortSignal): Promise<string> {
+  private async proposePatch(root: string, args: Record<string, unknown>, signal: AbortSignal): Promise<string> {
+    if (!Array.isArray(args.changes) || args.changes.length < 1 || args.changes.length > 4) {
+      throw new Error('propose_patch requires 1–4 existing files.');
+    }
+
+    const changes: Array<{ path: string; content: string }> = [];
+    const originals = new Map<string, string>();
+
+    for (const entry of args.changes) {
+      if (signal.aborted) {
+        throw new Error('Cancelled.');
+      }
+      const change = asRecord(entry);
+      const relative = requireString(change.path, 'path', 400);
+      const filename = await resolveWorkspaceFile(root, relative, false);
+      if (originals.has(filename)) {
+        throw new Error('Duplicate file in patch batch: ' + relative);
+      }
+      const readWindows = this.readFiles.get(path.resolve(filename));
+      if (!readWindows?.length) {
+        throw new Error('Use read_file before propose_patch: ' + relative);
+      }
+      const stats = await fs.stat(filename);
+      if (!stats.isFile()) {
+        throw new Error('Patches require an existing regular text file: ' + relative);
+      }
+      if (!Array.isArray(change.patches)) {
+        throw new Error('patches must be an array of exact find/replace snippets.');
+      }
+      const patches: ExactPatchHunk[] = change.patches.map((entry: unknown) => {
+        const hunk = asRecord(entry);
+        if (typeof hunk.find !== 'string' || typeof hunk.replace !== 'string') {
+          throw new Error('Every patch needs string find and replace fields.');
+        }
+        return { find: hunk.find, replace: hunk.replace };
+      });
+      const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filename));
+      const original = document.getText();
+      const currentWindows = readWindows.filter((read) => read.version === document.version);
+      if (!currentWindows.length) {
+        throw new Error('File changed since read_file; read the latest code before patching: ' + relative);
+      }
+      for (const patch of patches) {
+        if (!currentWindows.some((read) => read.text.includes(patch.find))) {
+          throw new Error('Patch snippet was not present in a read_file result: ' + relative);
+        }
+      }
+      const content = applyExactPatches(original, patches);
+      originals.set(filename, original);
+      changes.push({ path: relative, content });
+    }
+
+    // The normal full-file diff/approval/checkpoint implementation handles all
+    // writes. Pass the snapshots to block changes during patch preparation.
+    return this.proposeEdits(root, { changes }, signal, originals);
+  }
+
+  private async proposeEdits(
+    root: string, args: Record<string, unknown>, signal: AbortSignal,
+    expectedOriginals?: ReadonlyMap<string, string>,
+  ): Promise<string> {
     if (!Array.isArray(args.changes) || !args.changes.length || args.changes.length > 4) {
       throw new Error('propose_edits requires 1–4 changes.');
     }
@@ -342,11 +459,20 @@ export class AgentTools {
         }
         exists = false;
       }
-      if (exists && !this.readFiles.has(path.resolve(filename))) {
-        throw new Error('Read the file with read_file before proposing an edit: ' + relative);
-      }
       const uri = vscode.Uri.file(filename);
       const document = exists ? await vscode.workspace.openTextDocument(uri) : undefined;
+      if (exists && !expectedOriginals) {
+        // Full-file replacement is only safe after a complete, current read.
+        const windows = this.readFiles.get(path.resolve(filename)) ?? [];
+        if (!windows.some((item) =>
+          item.complete && item.version === document?.version && item.text === document?.getText()
+        )) {
+          throw new Error('Use read_file to inspect the entire current file before replacing it, or use propose_patch: ' + relative);
+        }
+      }
+      if (expectedOriginals?.has(filename) && document?.getText() !== expectedOriginals.get(filename)) {
+        throw new Error('Source changed while the patch was prepared. Read the file again: ' + relative);
+      }
       proposals.push({
         uri, relative, content: change.content, original: document?.getText() ?? '',
         originalVersion: document?.version ?? -1, exists,
