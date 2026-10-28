@@ -6,6 +6,7 @@ import { AgentRunner } from './agentRunner';
 import { captureSelection, readSettings } from './config';
 import { EditSelectionController } from './editSelection';
 import { registerInlineCompletion } from './inlineCompletion';
+import { EditCheckpoints } from './editCheckpoints';
 
 const SECRET_KEY = 'sbcCode.apiKey';
 
@@ -25,7 +26,8 @@ export function activate(context: vscode.ExtensionContext): void {
     () => Promise.resolve(context.secrets.get(SECRET_KEY)),
   );
 
-  const agentTools = new AgentTools(context);
+  const checkpoints = new EditCheckpoints(context);
+  const agentTools = new AgentTools(context, checkpoints);
   const agent = new AgentRunner(client, agentTools);
   const chat = new ChatViewProvider(context, client, agent);
   context.subscriptions.push(
@@ -33,7 +35,7 @@ export function activate(context: vscode.ExtensionContext): void {
       webviewOptions: { retainContextWhenHidden: true },
     }),
   );
-  const edits = new EditSelectionController(client, () => chat.getModel(), context);
+  const edits = new EditSelectionController(client, () => chat.getModel(), checkpoints, context);
   registerInlineCompletion(context, client, () => chat.getModel());
 
   function register(command: string, callback: () => Promise<void>): void {
@@ -55,6 +57,7 @@ export function activate(context: vscode.ExtensionContext): void {
   register('sbcCode.refreshModels', () => chat.refreshModels());
   register('sbcCode.selectModel', () => chat.chooseModel());
   register('sbcCode.editSelection', () => edits.run());
+  register('sbcCode.restoreLastEdit', () => checkpoints.restoreLast());
   register('sbcCode.explainSelection', async () => {
     const selection = captureSelection(vscode.window.activeTextEditor, readSettings().maxContextChars);
     await chat.explainSelection(selection);

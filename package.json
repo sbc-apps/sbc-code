@@ -1,8 +1,8 @@
 {
   "name": "sbc-code",
   "displayName": "SBC Code",
-  "description": "Local-first VS Code AI coding agent: Colibri chat, file-context attachments, visible agent steps, reviewed multi-file edits and inline suggestions.",
-  "version": "0.2.0",
+  "description": "Local-first VS Code AI coding agent with explicit file context, reviewable edits, reversible checkpoints and model tools.",
+  "version": "0.3.0",
   "publisher": "sbc-apps",
   "license": "UNLICENSED",
   "private": true,
@@ -29,7 +29,8 @@
     "onCommand:sbcCode.explainSelection",
     "onCommand:sbcCode.setApiKey",
     "onCommand:sbcCode.selectModel",
-    "onCommand:sbcCode.refreshModels"
+    "onCommand:sbcCode.refreshModels",
+    "onCommand:sbcCode.restoreLastEdit"
   ],
   "contributes": {
     "viewsContainers": {
@@ -80,6 +81,11 @@
         "command": "sbcCode.refreshModels",
         "title": "SBC Code: Refresh Models",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "sbcCode.restoreLastEdit",
+        "title": "SBC Code: Restore Last AI Edit",
+        "icon": "$(discard)"
       }
     ],
     "menus": {
@@ -105,6 +111,11 @@
           "command": "sbcCode.selectModel",
           "when": "view == sbcCode.chatView",
           "group": "navigation@2"
+        },
+        {
+          "command": "sbcCode.restoreLastEdit",
+          "when": "view == sbcCode.chatView",
+          "group": "navigation@3"
         }
       ]
     },

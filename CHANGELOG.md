@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 — development
+
+- Add a session-only checkpoint store for approved agent and selection edits.
+- Support one-command, diff-previewed restoration of the last AI edit.
+- Refuse to overwrite files modified after the edit, and require explicit confirmation before deleting new files.
+- Add Command Palette and sidebar controls, and size-bounded checkpoint tests.
+
 ## 0.2.0 — development
 
 - Attach up to three explicitly selected workspace files to one prompt, or use `@file(relative/path)` references.
