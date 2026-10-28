@@ -1,6 +1,7 @@
 import { ColibriClient } from './colibriClient';
 import { AgentTools, AGENT_TOOLS } from './agentTools';
 import { AgentToolMessage } from './agentTypes';
+import { AgentActivity, summarizeToolResult } from './agentActivity';
 
 const AGENT_PROMPT = [
   'You are SBC Code Agent, a cautious programming assistant operating inside a trusted local VS Code workspace.',
@@ -24,7 +25,7 @@ export class AgentRunner {
     maxTokens: number,
     temperature: number,
     signal: AbortSignal,
-    onStatus: (status: string) => void,
+    onActivity: (activity: AgentActivity) => void,
   ): Promise<string> {
     this.tools.resetTurn();
     const messages: AgentToolMessage[] = [
@@ -36,7 +37,7 @@ export class AgentRunner {
       if (signal.aborted) {
         throw new Error('Agent cancelled.');
       }
-      onStatus('Agent thinking (' + (round + 1) + '/5)…');
+      onActivity({ state: 'thinking', step: 'Thinking (' + (round + 1) + '/5)' });
       const reply = await this.api.agentStep(model, messages, AGENT_TOOLS, { maxTokens, temperature, signal });
       if (!reply.tool_calls.length) {
         return reply.content || 'The model returned no text or tool calls.';
@@ -46,18 +47,17 @@ export class AgentRunner {
         if (signal.aborted) {
           throw new Error('Agent cancelled.');
         }
+        const toolName = call.function.name;
+        onActivity({ state: 'started', step: toolName, id: call.id });
         let output: string;
         if (count >= 10) {
           output = JSON.stringify({ error: 'Tool budget reached. Summarize progress without further tool use.' });
         } else {
-          onStatus('Agent tool: ' + call.function.name);
           output = await this.tools.execute(call, signal);
           count++;
         }
+        onActivity({ state: 'finished', step: toolName, id: call.id, result: summarizeToolResult(output) });
         messages.push({ role: 'tool', tool_call_id: call.id, content: output.slice(0, 22000) });
-      }
-      if (count >= 10) {
-        onStatus('Agent tool budget reached; preparing summary…');
       }
     }
     return 'The agent reached its five-step limit. Review the proposed changes and continue with a shorter follow-up request.';

@@ -7,6 +7,9 @@
 ## Features
 
 - **Streaming chat** in a VS Code Activity Bar sidebar; stop a response at any time.
+- **File context:** explicitly attach up to three local source files from the editor sidebar, or reference a file with `@file(src/path.ts)` in your prompt.
+- **Agent activity timeline:** see thinking rounds and individual tool outcomes (done, declined or error).
+- **Code responses:** fenced code blocks with per-block copy actions and plain-text rendering that does not execute model-provided HTML.
 - **Agent mode:** inspect files, search the workspace, propose changes across up to four files per request, and run approved project checks.
 - **Diff and approvals:** review every proposed agent file change before applying; confirm each allowed test command before execution.
 - **Optional inline suggestions:** disabled by default because CPU inference may be too slow for per-keystroke completions.
@@ -76,6 +79,12 @@ Then use VS Code → **Extensions** → **...** → **Install from VSIX...**.
 
 Set an authenticated server's token with **SBC Code: Set API Key**. Leave the prompt empty to remove the saved token. Colibri does not require an API key by default.
 
+## Attach source files for context
+
+Use **+ File** above the chat input to select files in the current VS Code workspace. You can remove each attachment before sending. Alternatively, type `@file(src/app.ts)` in your message to explicitly include that file. Attachments are sent **only with that message** and are not cached as source text in later chat turns; reattach files for later context.
+
+For safety and local model performance, only one trusted local workspace is supported, with a maximum of **3 files**, **8,000 characters per file** and **16,000 characters total**. Secret files, external symlink targets and binary files are blocked. The extension does not search the whole repository just to pick a file.
+
 ## Edit selection safely
 
 1. Select code in a text editor.
@@ -101,7 +110,7 @@ Current tool limits: maximum 5 model rounds, 10 tool executions, 4 file edits in
 
 - Requests travel to the endpoint you configure. The default Colibri endpoint is on your own machine; changing the URL may send selected code to a different server.
 - Chat does not scan the repository without consent. Agent mode can read and search allowed workspace files via tools when you enable it; the contents of tool results are sent to your configured model endpoint.
-- Chat history is kept only in extension memory during the session. No analytics or telemetry are included.
+- Chat history is kept only in extension memory during the session. Attached file contents are excluded from future conversation turns; the model endpoint still receives them for the requested message. No analytics or telemetry are included.
 - Selection context has a configurable character cap. Secrets may be present in files you select; review before sending.
 - Model support for tools, context windows, and streaming varies. Agent mode requires compatible tool calling. It can run only an explicit allowlist of project checks with confirmation, and all code edits require review. Inline completion is experimental.
 - Large MoE models streamed from disk can be slow on CPU, especially with long prompts or repeated agent loops.

@@ -4,9 +4,10 @@ import { promises as fs } from 'node:fs';
 export function isRestrictedFile(relativePath: string): boolean {
   const parts = relativePath.replace(/\\/g, '/').toLowerCase().split('/');
   return parts.some((part) =>
-    part === '.git' || part === 'node_modules' || part === '.ssh' ||
-    part === '.env' || part.startsWith('.env.') ||
-    part === 'id_rsa' || part.endsWith('.pem') || part.endsWith('.key'),
+    ['.git', 'node_modules', '.ssh', '.aws', '.kube', '.gnupg', '.npmrc', '.pypirc', '.netrc', '.git-credentials'].includes(part) ||
+    part === '.env' || part.startsWith('.env.') || part.startsWith('id_rsa') ||
+    part.startsWith('id_ed25519') || part.endsWith('.pem') ||
+    part.endsWith('.key') || part.endsWith('.p12') || part.endsWith('.pfx'),
   );
 }
 

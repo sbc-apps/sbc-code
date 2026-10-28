@@ -4,6 +4,8 @@ import { ChatMessage, ColibriClient } from './colibriClient';
 import { AgentRunner } from './agentRunner';
 import { AgentToolMessage } from './agentTypes';
 import { captureSelection, readSettings, SelectedCode, selectionContext } from './config';
+import { FileAttachments } from './fileAttachments';
+import { parseFileMentions } from './fileContextText';
 
 const SYSTEM_PROMPT = [
   'You are SBC Code, a local-first programming assistant.',
@@ -26,6 +28,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private selectedModel: string;
   private history: ChatMessage[] = [];
   private currentRequest?: AbortController;
+  private readonly fileAttachments = new FileAttachments();
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -56,6 +59,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.view = undefined;
     });
     this.post({ type: 'models', models: this.models, selected: this.getModel() });
+    this.post({ type: 'attachments', files: this.fileAttachments.list() });
     void this.refreshModels();
   }
 
@@ -135,6 +139,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'cancel':
         this.currentRequest?.abort();
         break;
+      case 'attachFiles': {
+        const files = await this.fileAttachments.pick();
+        this.post({ type: 'attachments', files });
+        break;
+      }
+      case 'removeFile':
+        if (typeof input.file === 'string') {
+          this.fileAttachments.remove(input.file);
+          this.post({ type: 'attachments', files: this.fileAttachments.list() });
+        }
+        break;
       case 'refreshModels':
         await this.refreshModels();
         break;
@@ -154,6 +169,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'clear':
         this.currentRequest?.abort();
         this.history = [];
+        this.fileAttachments.clear();
+        this.post({ type: 'attachments', files: [] });
         this.post({ type: 'cleared' });
         break;
     }
@@ -203,20 +220,36 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     let selected: SelectedCode | undefined;
+    let attachedContext = '';
+    let attachedPaths: string[] = [];
     try {
       selected = explicitSelection ?? (attachSelection
         ? captureSelection(vscode.window.activeTextEditor, readSettings().maxContextChars)
         : undefined);
+      if (this.fileAttachments.list().length || parseFileMentions(prompt).length) {
+        const fileContext = await this.fileAttachments.buildContext(prompt);
+        attachedContext = fileContext.context;
+        attachedPaths = fileContext.paths;
+      }
     } catch (error) {
       this.post({ type: 'error', message: readableError(error) });
       return;
     }
 
     const settings = readSettings();
-    const userContent = selected ? selectionContext(selected) + '\n\nUser request:\n' + prompt : prompt;
-    const visiblePrompt = selected ? prompt + '\n\n[Attached selected code from ' + selected.file + ']' : prompt;
+    const pieces = [
+      ...(selected ? [selectionContext(selected)] : []),
+      ...(attachedContext ? [attachedContext] : []),
+      'User request:\n' + prompt,
+    ];
+    const userContent = pieces.join('\n\n');
+    const visiblePrompt = prompt +
+      (selected ? '\n[Selected code: ' + selected.file + ']' : '') +
+      (attachedPaths.length ? '\n[Files: ' + attachedPaths.join(', ') + ']' : '');
     const controller = new AbortController();
     this.currentRequest = controller;
+    this.fileAttachments.clear();  // Files are attached to this message only.
+    this.post({ type: 'attachments', files: [] });
     this.post({ type: 'user', text: visiblePrompt });
     this.post({ type: 'start', mode: agentMode ? 'Agent' : 'Chat' });
 
@@ -230,7 +263,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         ];
         answer = await this.agent.run(
           model, messages, settings.maxTokens, settings.temperature, controller.signal,
-          (message) => this.post({ type: 'activity', message }),
+          (activity) => this.post({
+            type: 'activity', state: activity.state, step: activity.step,
+            id: activity.id, result: activity.result,
+          }),
         );
         this.post({ type: 'delta', text: answer });
       } else {
@@ -250,7 +286,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         throw new Error('The model returned an empty response.');
       }
       if (!controller.signal.aborted) {
-        this.history.push({ role: 'user', content: userContent }, { role: 'assistant', content: answer });
+        // Keep only the referents, not full attached files, in later chat turns.
+        // The user can attach the file again when updated context is needed.
+        this.history.push({ role: 'user', content: visiblePrompt }, { role: 'assistant', content: answer });
         if (this.history.length > 12) {
           this.history = this.history.slice(-12);
         }
@@ -297,7 +335,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       '<form id="composer"><div class="mode-controls">',
       '<label class="mode"><input id="agent" type="checkbox"> Agent mode</label>',
       '<label class="context"><input id="attach" type="checkbox"> Attach selection</label>',
+      '<button id="attach-files" class="attach-files" type="button" title="Attach up to 3 local code files">+ File</button>',
       '</div>',
+      '<div id="attachments" class="attachments" aria-live="polite" hidden></div>',
       '<textarea id="prompt" rows="3" maxlength="12000" aria-label="Message" placeholder="Ask SBC Code to build, explain or fix…"></textarea>',
       '<div class="composer-actions"><span class="hint">Enter to send · Shift+Enter for newline</span>',
       '<button id="stop" type="button" hidden>Stop</button><button id="send" type="submit">Send</button></div>',
