@@ -1,8 +1,8 @@
 {
   "name": "sbc-code",
   "displayName": "SBC Code",
-  "description": "Local-first AI coding agent for VS Code, with Colibri chat, workspace tools, reviewed multi-file edits and optional inline suggestions.",
-  "version": "0.1.0",
+  "description": "Local-first VS Code AI coding agent: Colibri chat, file-context attachments, visible agent steps, reviewed multi-file edits and inline suggestions.",
+  "version": "0.2.0",
   "publisher": "sbc-apps",
   "license": "UNLICENSED",
   "private": true,
@@ -159,7 +159,7 @@
     "compile": "tsc -p .",
     "check": "tsc --noEmit -p .",
     "watch": "tsc -watch -p .",
-    "test": "npm run compile && node --test out/test/*.test.js",
+    "test": "npm run compile && node --test out/test/*.test.js && node --check media/chat.js",
     "package": "npm run compile && vsce package --no-dependencies"
   },
   "devDependencies": {

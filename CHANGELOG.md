@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 — development
+
+- Attach up to three explicitly selected workspace files to one prompt, or use `@file(relative/path)` references.
+- Enforce per-file and combined source-context limits, path and symlink protection, and explicit-only file transfer.
+- Display a tool activity timeline with thinking rounds, completion/decline/error status.
+- Render fenced code blocks safely with copy-code actions, without accepting model-supplied HTML.
+- Keep attached source code out of subsequent chat history to reduce accidental data reuse.
+- Add tests for file references, context bounds and tool status handling.
+
+# Changelog
+
 ## 0.1.0 — initial development version
 
 - Local Colibri / OpenAI-compatible chat with streaming output and cancellation.
