@@ -1,0 +1,171 @@
+{
+  "name": "sbc-code",
+  "displayName": "SBC Code",
+  "description": "Local-first AI coding agent for VS Code, with Colibri chat, workspace tools, reviewed multi-file edits and optional inline suggestions.",
+  "version": "0.1.0",
+  "publisher": "sbc-apps",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "SBC",
+    "Colibri",
+    "local AI",
+    "coding assistant",
+    "offline"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onView:sbcCode.chatView",
+    "onCommand:sbcCode.openChat",
+    "onCommand:sbcCode.editSelection",
+    "onCommand:sbcCode.explainSelection",
+    "onCommand:sbcCode.setApiKey",
+    "onCommand:sbcCode.selectModel",
+    "onCommand:sbcCode.refreshModels"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sbcCode",
+          "title": "SBC Code",
+          "icon": "media/sbc-code.svg"
+        }
+      ]
+    },
+    "views": {
+      "sbcCode": [
+        {
+          "id": "sbcCode.chatView",
+          "name": "AI Assistant",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "sbcCode.openChat",
+        "title": "SBC Code: Open Chat",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "sbcCode.editSelection",
+        "title": "SBC Code: Edit Selection",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "sbcCode.explainSelection",
+        "title": "SBC Code: Explain Selection",
+        "icon": "$(lightbulb)"
+      },
+      {
+        "command": "sbcCode.setApiKey",
+        "title": "SBC Code: Set API Key",
+        "icon": "$(key)"
+      },
+      {
+        "command": "sbcCode.selectModel",
+        "title": "SBC Code: Select Model",
+        "icon": "$(symbol-class)"
+      },
+      {
+        "command": "sbcCode.refreshModels",
+        "title": "SBC Code: Refresh Models",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "sbcCode.editSelection",
+          "when": "editorHasSelection",
+          "group": "navigation@10"
+        },
+        {
+          "command": "sbcCode.explainSelection",
+          "when": "editorHasSelection",
+          "group": "navigation@11"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "sbcCode.refreshModels",
+          "when": "view == sbcCode.chatView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "sbcCode.selectModel",
+          "when": "view == sbcCode.chatView",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "SBC Code",
+      "properties": {
+        "sbcCode.baseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000/v1",
+          "description": "Base URL of a Colibri or OpenAI-compatible API server. API keys are stored separately in VS Code SecretStorage."
+        },
+        "sbcCode.model": {
+          "type": "string",
+          "default": "",
+          "description": "Optional model ID override. Leave empty to use the model selected in the sidebar."
+        },
+        "sbcCode.maxTokens": {
+          "type": "integer",
+          "default": 1024,
+          "minimum": 64,
+          "maximum": 16384,
+          "description": "Maximum number of output tokens per request."
+        },
+        "sbcCode.temperature": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Sampling temperature for chat and code edits."
+        },
+        "sbcCode.maxContextChars": {
+          "type": "integer",
+          "default": 12000,
+          "minimum": 1000,
+          "maximum": 100000,
+          "description": "Maximum selected-code characters attached to a request; longer selections are rejected."
+        },
+        "sbcCode.allowInsecureRemote": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow unencrypted HTTP connections to non-local servers. Not recommended when sending source code."
+        },
+        "sbcCode.inlineSuggestions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable optional AI inline ghost-text suggestions. Disabled by default because Colibri models on CPU may be slow."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "check": "tsc --noEmit -p .",
+    "watch": "tsc -watch -p .",
+    "test": "npm run compile && node --test out/test/*.test.js",
+    "package": "npm run compile && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.2.0",
+    "typescript": "^5.6.3"
+  }
+}
