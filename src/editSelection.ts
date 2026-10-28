@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ColibriClient } from './colibriClient';
 import { readSettings, captureSelection } from './config';
 import { cleanReplacement, editMessages } from './codeEdit';
+import { EditCheckpoints } from './editCheckpoints';
 
 const PREVIEW_SCHEME = 'sbc-code-preview';
 
@@ -29,6 +30,7 @@ export class EditSelectionController {
   constructor(
     private readonly api: ColibriClient,
     private readonly getModel: () => string,
+    private readonly checkpoints: EditCheckpoints,
     context: vscode.ExtensionContext,
   ) {
     context.subscriptions.push(
@@ -133,6 +135,21 @@ export class EditSelectionController {
     if (!await vscode.workspace.applyEdit(workspaceEdit)) {
       throw new Error('VS Code could not apply the edit.');
     }
-    void vscode.window.showInformationMessage('SBC Code: edit applied. Review and save the file when ready.');
+    const checkpointSaved = this.checkpoints.record('Edit selection: ' + basename, [
+      { uri: document.uri, before: originalFullText, after: previewContent },
+    ]);
+    if (checkpointSaved) {
+      const action = await vscode.window.showInformationMessage(
+        'SBC Code: edit applied. Review and save the file when ready.',
+        'Restore Last Edit',
+      );
+      if (action === 'Restore Last Edit') {
+        await this.checkpoints.restoreLast();
+      }
+    } else {
+      void vscode.window.showWarningMessage(
+        'SBC Code: edit applied, but the file exceeded the checkpoint memory limit. Use VS Code Undo to reverse it.',
+      );
+    }
   }
 }

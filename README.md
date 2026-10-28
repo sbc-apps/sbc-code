@@ -2,7 +2,7 @@
 
 **Local-first AI coding agent for VS Code**, built by SBC. It works with [Colibri](https://github.com/JustVugg/colibri) and other OpenAI-compatible chat-completions servers.
 
-> **Status:** 0.1.0 experimental development build. Includes an initial tool-using Agent mode, but is not yet at feature parity with Codex, Claude Code or GitHub Copilot.
+> **Status:** 0.3.0 experimental development build. Includes an initial tool-using Agent mode, but is not yet at feature parity with Codex, Claude Code or GitHub Copilot.
 
 ## Features
 
@@ -12,6 +12,7 @@
 - **Code responses:** fenced code blocks with per-block copy actions and plain-text rendering that does not execute model-provided HTML.
 - **Agent mode:** inspect files, search the workspace, propose changes across up to four files per request, and run approved project checks.
 - **Diff and approvals:** review every proposed agent file change before applying; confirm each allowed test command before execution.
+- **Reversible edits:** restore the most recent AI edit, including reviewed multi-file edits, after preview and confirmation. Restore refuses to overwrite later user changes.
 - **Optional inline suggestions:** disabled by default because CPU inference may be too slow for per-keystroke completions.
 - **Model discovery** from `GET /v1/models`, model picker, and persistent selection.
 - **Explicit source context:** opt in to attaching the editor's selected code (never automatically sends the entire repository).
@@ -94,6 +95,12 @@ For safety and local model performance, only one trusted local workspace is supp
 5. Choose **Apply Change** to modify the current document. The extension refuses the change if the document changed while the model was working.
 
 Edits remain unsaved until you save the file yourself. The model may be incorrect: always review its proposed code and run your normal tests.
+
+## Restore the last AI edit
+
+Choose **Undo edit** in the SBC Code sidebar header or run **SBC Code: Restore Last AI Edit** from the Command Palette. The extension previews each file diff and asks for explicit confirmation before restoring. If the agent created a file, restore deletes that file **only after confirmation**. If any file has changed since the AI edit, the whole restore is refused rather than overwriting the newer work.
+
+Checkpoints exist **only in extension memory for this VS Code session**, up to five recent edit batches and 2,000,000 characters per batch. Large-file edits may exceed the checkpoint budget, in which case the editor warns you to use VS Code Undo instead. Restored files may need saving. This is not a replacement for version control.
 
 ## Agent workflow
 

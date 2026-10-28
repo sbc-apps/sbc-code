@@ -166,6 +166,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           await vscode.env.clipboard.writeText(input.text);
         }
         break;
+      case 'restoreLastEdit':
+        await vscode.commands.executeCommand('sbcCode.restoreLastEdit');
+        break;
       case 'clear':
         this.currentRequest?.abort();
         this.history = [];
@@ -323,7 +326,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       '<title>SBC Code</title></head><body>',
       '<main class="layout">',
       '<header class="heading"><div><strong>SBC Code</strong><span>Local AI Coding Agent</span></div>',
-      '<div class="header-actions"><button id="clear" type="button" title="Clear conversation">Clear</button>',
+      '<div class="header-actions"><button id="restore" type="button" title="Review and restore last AI edit">Undo edit</button>',
+      '<button id="clear" type="button" title="Clear conversation">Clear</button>',
       '<button id="key" type="button" title="Set API key">Key</button></div></header>',
       '<div class="models"><label for="model">Model</label><select id="model" aria-label="Select model"><option value="">Select a model</option></select>',
       '<button id="refresh" type="button" title="Refresh models" aria-label="Refresh models">↻</button></div>',

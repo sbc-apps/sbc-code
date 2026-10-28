@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { spawn } from 'node:child_process';
 import type { ToolCall } from './agentTypes';
+import { EditCheckpoints } from './editCheckpoints';
 import { isRestrictedFile, resolveWorkspaceFile } from './workspacePaths';
 
 export const AGENT_TOOLS = [
@@ -202,7 +203,7 @@ export class AgentTools {
   private readonly preview = new PreviewTextProvider();
   private readonly readFiles = new Set<string>();
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext, private readonly checkpoints: EditCheckpoints) {
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(PREVIEW_SCHEME, this.preview));
   }
 
@@ -400,7 +401,21 @@ export class AgentTools {
       throw new Error('VS Code refused to apply one or more edits.');
     }
     this.readFiles.clear();
-    return JSON.stringify({ applied: true, files: proposals.map((item) => item.relative), note: 'Edits were applied to the editor; user should review, test and save.' });
+    const checkpointSaved = this.checkpoints.record(
+      'Agent: ' + proposals.map((proposal) => proposal.relative).join(', '),
+      proposals.map((proposal) => ({
+        uri: proposal.uri,
+        before: proposal.exists ? proposal.original : null,
+        after: proposal.content,
+      })),
+    );
+    return JSON.stringify({
+      applied: true, files: proposals.map((item) => item.relative),
+      checkpointSaved,
+      note: checkpointSaved
+        ? 'Edits applied. Use SBC Code: Restore Last AI Edit to undo this batch.'
+        : 'Edits applied, but the files exceeded the in-memory checkpoint budget; use VS Code Undo if available.',
+    });
   }
 
   private async runChecks(root: string, args: Record<string, unknown>, signal: AbortSignal): Promise<string> {
