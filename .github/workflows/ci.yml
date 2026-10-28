@@ -1,21 +1,36 @@
 name: CI
 
+# SBC-owned runner pool. All eight runners have these shared labels.
 on:
   push:
-    branches: [main, "feat/**"]
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Avoid duplicate CI builds when new commits arrive on a PR.
+concurrency:
+  group: sbc-code-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # This is a public repository: never execute forked PR code on SBC servers.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, sbc, ci, docker]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
       - name: Install development dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Type-check
@@ -28,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sbc-code-vsix
-          path: "*.vsix"
+          path: '*.vsix'
           if-no-files-found: error
