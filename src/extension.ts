@@ -22,7 +22,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const settings = readSettings();
       return { baseUrl: settings.baseUrl, allowInsecureRemote: settings.allowInsecureRemote };
     },
-    () => context.secrets.get(SECRET_KEY),
+    () => Promise.resolve(context.secrets.get(SECRET_KEY)),
   );
 
   const agentTools = new AgentTools(context);
