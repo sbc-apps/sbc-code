@@ -2,7 +2,7 @@
 
 **Local-first AI coding agent for VS Code**, built by SBC. It works with [Colibri](https://github.com/JustVugg/colibri) and other OpenAI-compatible chat-completions servers.
 
-> **Status:** 0.3.0 experimental development build. Includes an initial tool-using Agent mode, but is not yet at feature parity with Codex, Claude Code or GitHub Copilot.
+> **Status:** 0.4.0 experimental development build. Includes an initial tool-using Agent mode, but is not yet at feature parity with Codex, Claude Code or GitHub Copilot.
 
 ## Features
 
@@ -10,7 +10,8 @@
 - **File context:** explicitly attach up to three local source files from the editor sidebar, or reference a file with `@file(src/path.ts)` in your prompt.
 - **Agent activity timeline:** see thinking rounds and individual tool outcomes (done, declined or error).
 - **Code responses:** fenced code blocks with per-block copy actions and plain-text rendering that does not execute model-provided HTML.
-- **Agent mode:** inspect files, search the workspace, propose changes across up to four files per request, and run approved project checks.
+- **Agent mode:** inspect files, search the workspace, propose exact source patches or full-file changes across up to four files, and run approved project checks.
+- **Exact patch editing:** replace small unique source snippets rather than rewriting the full file; reject stale, ambiguous, overlapping or unread code.
 - **Diff and approvals:** review every proposed agent file change before applying; confirm each allowed test command before execution.
 - **Reversible edits:** restore the most recent AI edit, including reviewed multi-file edits, after preview and confirmation. Restore refuses to overwrite later user changes.
 - **Optional inline suggestions:** disabled by default because CPU inference may be too slow for per-keystroke completions.
@@ -96,6 +97,27 @@ For safety and local model performance, only one trusted local workspace is supp
 
 Edits remain unsaved until you save the file yourself. The model may be incorrect: always review its proposed code and run your normal tests.
 
+## Targeted Agent patches and line-range reads
+
+The Agent now exposes `propose_patch` for targeted edits to existing files. Unlike `propose_edits`, it does not ask the model to return the entire source file. Each patch uses a **literal, exact** `find` string and a `replace` string; an empty replacement deletes just the matched snippet. A snippet must be unique, non-overlapping, and present in the source actually returned by `read_file` for the current Agent turn. All edits still use VS Code diff previews, user approval, and session-only undo checkpoints.
+
+For larger files, `read_file` accepts an optional **1-based** line range `start_line` and `end_line`, with a maximum of 250 lines and 18,000 characters in the returned window. Its metadata reports total line count, and the source text preserves original line endings. The file itself is capped at 512 KiB. If the whole file is longer than the context limit, the model must request a smaller window before applying a patch.
+
+Full-file replacements of existing files remain available with `propose_edits`, but now require a complete, current `read_file` result. New files can still be proposed separately. Neither path can write files without user approval. Patch batches support 1–4 files and at most 8 non-overlapping snippets per file. Only already-read source may be modified.
+
+```json
+{
+  "changes": [
+    {
+      "path": "src/app.ts",
+      "patches": [
+        { "find": "const enabled = false;", "replace": "const enabled = true;" }
+      ]
+    }
+  ]
+}
+```
+
 ## Restore the last AI edit
 
 Choose **Undo edit** in the SBC Code sidebar header or run **SBC Code: Restore Last AI Edit** from the Command Palette. The extension previews each file diff and asks for explicit confirmation before restoring. If the agent created a file, restore deletes that file **only after confirmation**. If any file has changed since the AI edit, the whole restore is refused rather than overwriting the newer work.
@@ -111,7 +133,7 @@ Checkpoints exist **only in extension memory for this VS Code session**, up to f
 5. Review each diff and select **Approve File** before the change is applied.
 6. A proposed test or build runs only after **Run Once** confirmation.
 
-Current tool limits: maximum 5 model rounds, 10 tool executions, 4 file edits in one proposal, 48 KiB file-read size, no workspace secrets, no arbitrary terminal commands, and no multi-root workspace. A file must be read by the agent before it may be edited. No automatic commits, pushes, or deployments.
+Current tool limits: maximum 5 model rounds, 10 tool executions, 4 files in one edit proposal, 512 KiB file size for bounded reads, 18,000 returned characters per read, 8 exact patch snippets per file, no workspace secrets, no arbitrary terminal commands, and no multi-root workspace. A file must be read by the agent before it may be edited. No automatic commits, pushes, or deployments.
 
 ## Privacy and limits
 

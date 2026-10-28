@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — development
+
+- Add `propose_patch` to make exact, reviewable multi-file source edits without returning complete file contents.
+- Reject ambiguous, overlapping, stale, unseen and no-op snippets; keep existing diff approval and undo checkpoints.
+- Add `read_file` line windows (1-based, 250 lines and 18,000-character response limit) for files up to 512 KiB.
+- Include unsaved VS Code text in Agent reads and check read version before patching.
+- Require complete current reads before the model may replace an existing entire file.
+- Add regression tests for exact patch matching, overlaps, line endings and range bounds.
+
+
 ## 0.3.0 — development
 
 - Add a session-only checkpoint store for approved agent and selection edits.
@@ -15,8 +25,6 @@
 - Render fenced code blocks safely with copy-code actions, without accepting model-supplied HTML.
 - Keep attached source code out of subsequent chat history to reduce accidental data reuse.
 - Add tests for file references, context bounds and tool status handling.
-
-# Changelog
 
 ## 0.1.0 — initial development version
 
