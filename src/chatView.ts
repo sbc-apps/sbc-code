@@ -9,6 +9,7 @@ import { parseFileMentions } from './fileContextText';
 import { getWorkspaceDiagnostics } from './diagnostics';
 import { diagnosticsForAgent, summarizeDiagnostics } from './diagnosticContext';
 import { ModelProvider } from './modelProviders';
+import { PROVIDER_STATE_KEY, selectProvider } from './providerSelection';
 
 const SYSTEM_PROMPT = [
   'You are SBC Code, a local-first programming assistant.',
@@ -217,9 +218,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             throw new Error('Stop the running response before switching model servers.');
           }
           if (readSettings().provider !== input.provider) {
-            await vscode.workspace.getConfiguration('sbcCode').update(
-              'provider', input.provider, vscode.ConfigurationTarget.Global,
-            );
+            // Persist without writing User Settings. VS Code may still have
+            // stale extension configuration metadata after a VSIX update.
+            selectProvider(input.provider);
+            await this.context.globalState.update(PROVIDER_STATE_KEY, input.provider);
             await this.onProviderSettingsChanged();
           }
         }

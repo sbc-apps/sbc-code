@@ -8,6 +8,8 @@ import { EditSelectionController } from './editSelection';
 import { registerInlineCompletion } from './inlineCompletion';
 import { EditCheckpoints } from './editCheckpoints';
 import { ReleaseUpdates } from './releaseUpdates';
+import { PROVIDER_STATE_KEY, initializeProvider, selectProvider } from './providerSelection';
+import { validProvider } from './providerSelection';
 
 const SECRET_KEY = 'sbcCode.apiKey';
 
@@ -19,6 +21,12 @@ function errorMessage(error: unknown): string {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  const config = vscode.workspace.getConfiguration('sbcCode');
+  initializeProvider(
+    context.globalState.get<string>(PROVIDER_STATE_KEY),
+    config.get<string>('provider', 'colibri'),
+  );
+
   const client = new ColibriClient(
     () => {
       const settings = readSettings();
@@ -93,6 +101,16 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
+    if (event.affectsConfiguration('sbcCode.provider')) {
+      // Respect changes made manually in settings.json, without relying on
+      // configuration writes when the provider is selected from the sidebar.
+      const configured = vscode.workspace.getConfiguration('sbcCode').get<string>('provider', 'colibri');
+      const provider = validProvider(configured);
+      if (provider) {
+        selectProvider(provider);
+        void context.globalState.update(PROVIDER_STATE_KEY, provider);
+      }
+    }
     if (event.affectsConfiguration('sbcCode.baseUrl') ||
         event.affectsConfiguration('sbcCode.ollamaBaseUrl') ||
         event.affectsConfiguration('sbcCode.provider')) {

@@ -4,11 +4,15 @@
 
 **Local-first AI coding agent for VS Code**, built by SBC. Works with [Colibri](https://github.com/JustVugg/colibri), [Ollama](https://ollama.com/), and compatible local AI servers.
 
-> **Status:** 0.7.0 experimental development build. Supports Colibri and Ollama providers; still under development.
+> **Status:** 0.7.1 development build with a fix for Ollama provider switching in VS Code.
 
 ## Logo
 
 The extension's visual identity uses the original SBC 227×227 PNG from [`sbc-apps/sbc-signer-extension/public/logo.png`](https://github.com/sbc-apps/sbc-signer-extension/blob/main/public/logo.png). The activity-bar SVG matches the original mark in [`sbc-apps/sbc-website/public/logo.svg`](https://github.com/sbc-apps/sbc-website/blob/main/public/logo.svg). Both are kept in `media/` and packaged into the VSIX.
+
+## Fixing "sbcCode.provider is not a registered configuration"
+
+Install **v0.7.1** through the GitHub Release or the in-extension update notification, then run **Developer: Reload Window** from VS Code's Command Palette. The provider selector now stores its selection in extension state rather than writing to User Settings, avoiding the error when VS Code retains older VSIX configuration metadata. If the extension still shows a previous version, uninstall its old installation, reload VS Code and reinstall the new VSIX. Verify the installed version from Extensions → SBC Code → version.
 
 ## Use Ollama as your coding model server
 
@@ -23,7 +27,7 @@ ollama serve
 
 If Ollama already runs in the background, you do not need to start `ollama serve` again. Use `ollama list` to see locally installed models. SBC Code connects to the Ollama origin at `http://127.0.0.1:11434` by default. You can change it with `sbcCode.ollamaBaseUrl`. The editor uses Ollama's OpenAI-compatible `/v1/chat/completions` for chat, streaming and tools, and `/api/tags` for model discovery. **Tool support depends on the selected Ollama model.** The extension intentionally omits the unsupported `tool_choice` request parameter when using Ollama.
 
-The **Provider** choice is persisted in VS Code settings; each provider remembers its own selected model. The legacy Colibri server URL and `sbcCode.model` setting are preserved. For Ollama use the separate `sbcCode.ollamaModel` override if required; otherwise leave it empty. **Your Colibri API key is not forwarded to Ollama.** Local Ollama does not require a key. Configuring remote HTTP Ollama requires the existing explicit `sbcCode.allowInsecureRemote` option; prefer HTTPS.
+The sidebar **Provider** choice is saved in VS Code extension storage (not written to `settings.json`), so switching works even when VS Code has not refreshed extension configuration metadata. You can still set `sbcCode.provider` manually in a correctly loaded extension's Settings; each provider remembers its own selected model. The legacy Colibri server URL and `sbcCode.model` setting are preserved. For Ollama use the separate `sbcCode.ollamaModel` override if required; otherwise leave it empty. **Your Colibri API key is not forwarded to Ollama.** Local Ollama does not require a key. Configuring remote HTTP Ollama requires the existing explicit `sbcCode.allowInsecureRemote` option; prefer HTTPS.
 
 ### Example VS Code settings
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.1 — provider settings registration compatibility
+
+- Fix the "sbcCode.provider is not a registered configuration" failure when switching model providers.
+- Store provider selection in VS Code extension global state instead of writing to User Settings.
+- Preserve manual provider changes from settings.json, independent model preferences and Colibri/Ollama endpoints.
+- Add tests for provider state selection and the settings contribution in package.json.
+
+
 ## 0.7.0 — Ollama provider
 
 - Add Ollama as a first-class provider in the SBC Code sidebar, alongside Colibri.
