@@ -100,3 +100,7 @@ textarea {
 .write-report div { margin: 2px 0; }
 .write-report.changed { border-color: var(--vscode-testing-iconPassed, var(--vscode-focusBorder)); }
 .write-report.unchanged { border-color: var(--vscode-editorWarning-foreground, var(--vscode-panel-border)); }
+
+.edit-policy { font-size: 11px; padding: 1px 0 7px; color: var(--vscode-descriptionForeground); }
+.changed-file-link { display: block; width: 100%; text-align: left; background: transparent; color: var(--vscode-textLink-foreground); border: 0; padding: 3px 2px; overflow-wrap: anywhere; }
+.changed-file-link:hover { text-decoration: underline; color: var(--vscode-textLink-activeForeground); }

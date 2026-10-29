@@ -27,17 +27,28 @@ export async function resolveWorkspaceFile(root: string, relativePath: string, a
   }
 
   const rootReal = await fs.realpath(root);
-  let real: string;
-  try {
-    real = await fs.realpath(absolute);
-  } catch (error) {
-    if (!allowNew || (error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw error;
+  // Resolve the nearest existing ancestor. The parent of a new file may be
+  // missing (e.g. src/components/Calculator.tsx), but symlinks must not escape
+  // the actual workspace. Do not create any folders during path validation.
+  let ancestor = absolute;
+  let real: string | undefined;
+  while (true) {
+    try {
+      real = await fs.realpath(ancestor);
+      break;
+    } catch (error) {
+      if (!allowNew || (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+      const parent = path.dirname(ancestor);
+      if (parent === ancestor) {
+        throw new Error('Workspace file path cannot be resolved.');
+      }
+      ancestor = parent;
     }
-    const parentReal = await fs.realpath(path.dirname(absolute));
-    real = path.join(parentReal, path.basename(absolute));
   }
-  const fromRoot = path.relative(rootReal, real);
+  const resolved = path.resolve(real!, path.relative(ancestor, absolute));
+  const fromRoot = path.relative(rootReal, resolved);
   if (!fromRoot || fromRoot.startsWith('..' + path.sep) || fromRoot === '..' || path.isAbsolute(fromRoot)) {
     throw new Error('Resolved file is outside the trusted workspace (possibly through a symlink).');
   }

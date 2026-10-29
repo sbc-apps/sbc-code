@@ -56,7 +56,7 @@ export const AGENT_TOOLS = [
     type: 'function',
     function: {
       name: 'propose_patch',
-      description: 'Prefer this for targeted code changes. For 1–4 previously read files, replace exact, unique source snippets. Supports up to 8 non-overlapping find/replace hunks per file. Never send full file content. Each change opens a VS Code diff and requires user approval before applying.',
+      description: 'Prefer this for targeted code edits in 1–4 previously read files. Replace unique exact source snippets (up to eight per file). Changes are auto-applied/saved in automatic mode or reviewed in manual mode. Never use full-file content for existing files.',
       parameters: {
         type: 'object',
         properties: {
@@ -97,7 +97,7 @@ export const AGENT_TOOLS = [
     type: 'function',
     function: {
       name: 'propose_edits',
-      description: 'Propose full file content for up to four workspace files. The extension shows VS Code diffs and asks the user before making any edits. Always read a file before editing it.',
+      description: 'Create new files or replace up to four existing files inside the trusted workspace. Changes are automatically saved to disk in automatic mode, or diff-reviewed in manual mode. Read existing files before replacing them.',
       parameters: {
         type: 'object',
         properties: {
@@ -498,22 +498,25 @@ export class AgentTools {
       });
     }
 
-    for (const proposal of proposals) {
-      if (signal.aborted) {
-        throw new Error('Cancelled.');
-      }
-      const basename = path.basename(proposal.relative);
-      const original = proposal.exists
-        ? proposal.uri
-        : this.preview.store('', 'empty-' + basename);
-      const proposed = this.preview.store(proposal.content, 'new-' + basename);
-      await vscode.commands.executeCommand('vscode.diff', original, proposed, 'SBC Code Agent: ' + proposal.relative);
-      const choice = await vscode.window.showInformationMessage(
-        'SBC Code Agent proposes changes to ' + proposal.relative + '. Review the diff.',
-        'Approve File', 'Reject Changes',
-      );
-      if (choice !== 'Approve File') {
-        return JSON.stringify({ applied: false, reason: 'User rejected or dismissed edit.' });
+    const auto = vscode.workspace.getConfiguration('sbcCode').get<string>('agentEditMode', 'automatic') === 'automatic';
+    if (!auto) {
+      for (const proposal of proposals) {
+        if (signal.aborted) {
+          throw new Error('Cancelled.');
+        }
+        const basename = path.basename(proposal.relative);
+        const original = proposal.exists
+          ? proposal.uri
+          : this.preview.store('', 'empty-' + basename);
+        const proposed = this.preview.store(proposal.content, 'new-' + basename);
+        await vscode.commands.executeCommand('vscode.diff', original, proposed, 'SBC Code Agent: ' + proposal.relative);
+        const choice = await vscode.window.showInformationMessage(
+          'SBC Code Agent proposes changes to ' + proposal.relative + '. Review the diff.',
+          'Approve File', 'Reject Changes',
+        );
+        if (choice !== 'Approve File') {
+          return JSON.stringify({ applied: false, reason: 'User rejected or dismissed edit.' });
+        }
       }
     }
     if (signal.aborted) {
@@ -542,8 +545,20 @@ export class AgentTools {
         edit.insert(proposal.uri, new vscode.Position(0, 0), proposal.content);
       }
     }
+    // VS Code's WorkspaceEdit can produce dirty buffers. Save them explicitly:
+    // "created" only means the target actually exists on disk with the full
+    // expected content, not that a webview message or unsaved edit was emitted.
+    for (const proposal of proposals) {
+      if (!proposal.exists) {
+        await fs.mkdir(path.dirname(proposal.uri.fsPath), { recursive: true });
+        await resolveWorkspaceFile(root, proposal.relative, true);
+      }
+    }
+    if (signal.aborted) {
+      throw new Error('Cancelled.');
+    }
     if (!await vscode.workspace.applyEdit(edit)) {
-      throw new Error('VS Code refused to apply one or more edits.');
+      throw new Error('VS Code refused to apply the workspace edit.');
     }
     this.readFiles.clear();
     const checkpointSaved = this.checkpoints.record(
@@ -554,15 +569,37 @@ export class AgentTools {
         after: proposal.content,
       })),
     );
+    const created: string[] = [];
+    const modified: string[] = [];
+    const failed: string[] = [];
+    for (const proposal of proposals) {
+      try {
+        await resolveWorkspaceFile(root, proposal.relative, false);
+        const doc = await vscode.workspace.openTextDocument(proposal.uri);
+        if (doc.getText() !== proposal.content) {
+          throw new Error('Editor content differs from proposed edit');
+        }
+        if (!await doc.save()) {
+          throw new Error('VS Code could not save the document');
+        }
+        const saved = await fs.readFile(proposal.uri.fsPath, 'utf8');
+        if (saved !== proposal.content) {
+          throw new Error('Saved file content does not match proposed edit');
+        }
+        (proposal.exists ? modified : created).push(proposal.relative);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        failed.push(proposal.relative + ': ' + reason);
+      }
+    }
     return JSON.stringify({
-      applied: true,
-      files: proposals.map((item) => item.relative),
-      created: proposals.filter((item) => !item.exists).map((item) => item.relative),
-      modified: proposals.filter((item) => item.exists).map((item) => item.relative),
+      applied: created.length + modified.length > 0,
+      files: [...created, ...modified],
+      created, modified, failed, auto,
       checkpointSaved,
-      note: checkpointSaved
-        ? 'Edits applied. Use SBC Code: Restore Last AI Edit to undo this batch.'
-        : 'Edits applied, but the files exceeded the in-memory checkpoint budget; use VS Code Undo if available.',
+      note: failed.length
+        ? 'Some edits could not be saved. Review the open editor buffers and failures.'
+        : 'Edits saved and verified on disk. Use SBC Code: Restore Last AI Edit to undo this batch.',
     });
   }
 
