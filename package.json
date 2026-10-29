@@ -1,8 +1,8 @@
 {
   "name": "sbc-code",
   "displayName": "SBC Code",
-  "description": "Local-first VS Code AI coding agent with exact patch edits, bounded source reads, reviewed file changes and Colibri models.",
-  "version": "0.4.0",
+  "description": "Local-first VS Code coding agent: Colibri, workspace diagnostics, reviewed exact patches, reversible edits and local inference.",
+  "version": "0.5.0",
   "publisher": "sbc-apps",
   "license": "UNLICENSED",
   "private": true,
@@ -30,7 +30,8 @@
     "onCommand:sbcCode.setApiKey",
     "onCommand:sbcCode.selectModel",
     "onCommand:sbcCode.refreshModels",
-    "onCommand:sbcCode.restoreLastEdit"
+    "onCommand:sbcCode.restoreLastEdit",
+    "onCommand:sbcCode.fixDiagnostics"
   ],
   "contributes": {
     "viewsContainers": {
@@ -86,6 +87,11 @@
         "command": "sbcCode.restoreLastEdit",
         "title": "SBC Code: Restore Last AI Edit",
         "icon": "$(discard)"
+      },
+      {
+        "command": "sbcCode.fixDiagnostics",
+        "title": "SBC Code: Fix Current File Diagnostics",
+        "icon": "$(wrench)"
       }
     ],
     "menus": {
@@ -99,6 +105,11 @@
           "command": "sbcCode.explainSelection",
           "when": "editorHasSelection",
           "group": "navigation@11"
+        },
+        {
+          "command": "sbcCode.fixDiagnostics",
+          "when": "resourceScheme == file",
+          "group": "navigation@12"
         }
       ],
       "view/title": [
@@ -171,7 +182,9 @@
     "check": "tsc --noEmit -p .",
     "watch": "tsc -watch -p .",
     "test": "npm run compile && node --test out/test/*.test.js && node --check media/chat.js",
-    "package": "npm run compile && vsce package --no-dependencies"
+    "package": "npm run compile && vsce package --no-dependencies",
+    "smoke:colibri": "node scripts/colibri-smoke.mjs",
+    "check:smoke": "node --check scripts/colibri-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",

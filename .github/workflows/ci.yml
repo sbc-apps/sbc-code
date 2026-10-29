@@ -37,6 +37,8 @@ jobs:
         run: npm run check
       - name: Unit tests
         run: npm test
+      - name: Smoke script syntax
+        run: npm run check:smoke
       - name: Package VSIX
         run: npm run package
       - name: Upload VSIX

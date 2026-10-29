@@ -8,3 +8,4 @@ out/test/**
 tsconfig.json
 .gitignore
 *.vsix
+scripts/**

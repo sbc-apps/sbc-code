@@ -206,6 +206,7 @@
   document.getElementById('key').addEventListener('click', function () { post('setApiKey'); });
   document.getElementById('clear').addEventListener('click', function () { post('clear'); });
   document.getElementById('restore').addEventListener('click', function () { post('restoreLastEdit'); });
+  document.getElementById('fix-diagnostics').addEventListener('click', function () { post('fixDiagnostics'); });
   document.getElementById('attach-files').addEventListener('click', function () { post('attachFiles'); });
   models.addEventListener('change', function () {
     if (models.value) {

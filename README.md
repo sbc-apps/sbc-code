@@ -2,7 +2,7 @@
 
 **Local-first AI coding agent for VS Code**, built by SBC. It works with [Colibri](https://github.com/JustVugg/colibri) and other OpenAI-compatible chat-completions servers.
 
-> **Status:** 0.4.0 experimental development build. Includes an initial tool-using Agent mode, but is not yet at feature parity with Codex, Claude Code or GitHub Copilot.
+> **Status:** 0.5.0 experimental development build. Includes an initial tool-using Agent mode, but is not yet at feature parity with Codex, Claude Code or GitHub Copilot.
 
 ## Features
 
@@ -10,7 +10,7 @@
 - **File context:** explicitly attach up to three local source files from the editor sidebar, or reference a file with `@file(src/path.ts)` in your prompt.
 - **Agent activity timeline:** see thinking rounds and individual tool outcomes (done, declined or error).
 - **Code responses:** fenced code blocks with per-block copy actions and plain-text rendering that does not execute model-provided HTML.
-- **Agent mode:** inspect files, search the workspace, propose exact source patches or full-file changes across up to four files, and run approved project checks.
+- **Agent mode:** inspect files, search the workspace, read VS Code Problems, propose exact source patches or full-file changes across up to four files, and run approved project checks.
 - **Exact patch editing:** replace small unique source snippets rather than rewriting the full file; reject stale, ambiguous, overlapping or unread code.
 - **Diff and approvals:** review every proposed agent file change before applying; confirm each allowed test command before execution.
 - **Reversible edits:** restore the most recent AI edit, including reviewed multi-file edits, after preview and confirmation. Restore refuses to overwrite later user changes.
@@ -96,6 +96,24 @@ For safety and local model performance, only one trusted local workspace is supp
 5. Choose **Apply Change** to modify the current document. The extension refuses the change if the document changed while the model was working.
 
 Edits remain unsaved until you save the file yourself. The model may be incorrect: always review its proposed code and run your normal tests.
+
+## Fix VS Code Problems
+
+Use **Fix problems** in the SBC Code sidebar, right-click in an editor and select **SBC Code: Fix Current File Diagnostics**, or open the Command Palette and run that command. The extension retrieves the current file's diagnostics from VS Code (including TypeScript/ESLint diagnostics when their language services are active) and asks the Agent to inspect relevant code and propose exact patches.
+
+The Agent also has a read-only `get_diagnostics` tool for Problems in the trusted workspace or a specific file. Results are bounded to 40 entries with truncated diagnostic messages. Only files inside the one trusted local workspace are eligible. **No compiler or linter is executed** merely to read Problems, and proposed edits still require review and approval.
+
+## Local Colibri HTTP compatibility tests
+
+The development test suite starts a local HTTP server that imitates the documented Colibri API and checks model discovery, authorization, ordinary chat responses, fragmented SSE streaming, OpenAI tool calls and API error handling. This verifies the extension's transport contract but does **not** prove correct model output from a real Colibri installation. Real-model testing is still required before production release. To run a manual test against a Colibri server you have installed locally, use:
+
+```bash
+COLIBRI_BASE_URL=http://127.0.0.1:8000/v1 npm run smoke:colibri
+# Optional: check tool-calling protocol (requires a compatible model)
+npm run smoke:colibri -- --tools
+```
+
+You can set `COLIBRI_MODEL` to choose a specific installed model and `COLIBRI_API_KEY` if the server requires authentication. This smoke test sends a short fixed prompt, does not read your code, and does not execute model-proposed tools. It can be slow on CPU-only large models.
 
 ## Targeted Agent patches and line-range reads
 

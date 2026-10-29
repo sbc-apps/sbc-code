@@ -6,6 +6,7 @@ import type { ToolCall } from './agentTypes';
 import { EditCheckpoints } from './editCheckpoints';
 import { applyExactPatches, ExactPatchHunk } from './exactPatches';
 import { selectSourceWindow } from './sourceWindow';
+import { getWorkspaceDiagnostics } from './diagnostics';
 import { isRestrictedFile, resolveWorkspaceFile } from './workspacePaths';
 
 export const AGENT_TOOLS = [
@@ -115,6 +116,20 @@ export const AGENT_TOOLS = [
           },
         },
         required: ['changes'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_diagnostics',
+      description: 'Read current error/warning messages from VS Code Problems, optionally for one workspace-relative path. Read-only; no builds run. Use these diagnostics to identify fixes, then read_file and propose_patch before editing.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Optional workspace-relative path. Omit to list current Problems across the workspace.' },
+        },
         additionalProperties: false,
       },
     },
@@ -291,6 +306,10 @@ export class AgentTools {
           return await this.proposePatch(root, args, signal);
         case 'run_checks':
           return await this.runChecks(root, args, signal);
+        case 'get_diagnostics':
+          return JSON.stringify(await getWorkspaceDiagnostics(
+            args.path === undefined ? undefined : requireString(args.path, 'path', 400),
+          ));
         default:
           throw new Error('Unknown or disallowed agent tool: ' + call.function.name);
       }
