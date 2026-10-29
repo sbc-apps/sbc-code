@@ -1,8 +1,14 @@
 # SBC Code
 
+<img src="media/sbc-logo.png" alt="SBC official logo" width="96" height="96">
+
 **Local-first AI coding agent for VS Code**, built by SBC. It works with [Colibri](https://github.com/JustVugg/colibri) and other OpenAI-compatible chat-completions servers.
 
-> **Status:** 0.6.0 experimental development build. Not yet at full feature parity with Codex, Claude Code or GitHub Copilot. Includes an initial tool-using Agent mode, but is not yet at feature parity with Codex, Claude Code or GitHub Copilot.
+> **Status:** 0.6.1 experimental development build. The VS Code extension uses the official SBC brand icon; runtime capabilities remain experimental.
+
+## Logo
+
+The extension's visual identity uses the original SBC 227×227 PNG from [`sbc-apps/sbc-signer-extension/public/logo.png`](https://github.com/sbc-apps/sbc-signer-extension/blob/main/public/logo.png). The activity-bar SVG matches the original mark in [`sbc-apps/sbc-website/public/logo.svg`](https://github.com/sbc-apps/sbc-website/blob/main/public/logo.svg). Both are kept in `media/` and packaged into the VSIX.
 
 ## Features
 

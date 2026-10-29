@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1 — official SBC icon
+
+- Use the original SBC organization logo as the VSIX/extension listing icon (`media/sbc-logo.png`).
+- Replace the Activity Bar's generic code icon with the official SBC SVG mark (`media/sbc-code.svg`).
+- Add a packaging regression test to verify that the logo asset matches the approved SBC source.
+
+
 ## 0.6.0 — GitHub Releases and updates
 
 - Automatically publish stable GitHub Releases from successful trusted main-branch CI using SBC self-hosted runners.
