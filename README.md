@@ -2,13 +2,41 @@
 
 <img src="media/sbc-logo.png" alt="SBC official logo" width="96" height="96">
 
-**Local-first AI coding agent for VS Code**, built by SBC. It works with [Colibri](https://github.com/JustVugg/colibri) and other OpenAI-compatible chat-completions servers.
+**Local-first AI coding agent for VS Code**, built by SBC. Works with [Colibri](https://github.com/JustVugg/colibri), [Ollama](https://ollama.com/), and compatible local AI servers.
 
-> **Status:** 0.6.1 experimental development build. The VS Code extension uses the official SBC brand icon; runtime capabilities remain experimental.
+> **Status:** 0.7.0 experimental development build. Supports Colibri and Ollama providers; still under development.
 
 ## Logo
 
 The extension's visual identity uses the original SBC 227×227 PNG from [`sbc-apps/sbc-signer-extension/public/logo.png`](https://github.com/sbc-apps/sbc-signer-extension/blob/main/public/logo.png). The activity-bar SVG matches the original mark in [`sbc-apps/sbc-website/public/logo.svg`](https://github.com/sbc-apps/sbc-website/blob/main/public/logo.svg). Both are kept in `media/` and packaged into the VSIX.
+
+## Use Ollama as your coding model server
+
+SBC Code supports both **Colibri** (the existing default) and **Ollama**. In the SBC Code sidebar, choose **Ollama (Local)** from the **Provider** dropdown. The model list refreshes from Ollama's native `GET /api/tags` endpoint and shows models already installed on your computer. Select a model and use Chat, Agent, code edits and optional inline completion exactly as with Colibri.
+
+On the machine running VS Code and Ollama, install a model and start the Ollama service:
+
+```bash
+ollama pull qwen3-coder
+ollama serve
+```
+
+If Ollama already runs in the background, you do not need to start `ollama serve` again. Use `ollama list` to see locally installed models. SBC Code connects to the Ollama origin at `http://127.0.0.1:11434` by default. You can change it with `sbcCode.ollamaBaseUrl`. The editor uses Ollama's OpenAI-compatible `/v1/chat/completions` for chat, streaming and tools, and `/api/tags` for model discovery. **Tool support depends on the selected Ollama model.** The extension intentionally omits the unsupported `tool_choice` request parameter when using Ollama.
+
+The **Provider** choice is persisted in VS Code settings; each provider remembers its own selected model. The legacy Colibri server URL and `sbcCode.model` setting are preserved. For Ollama use the separate `sbcCode.ollamaModel` override if required; otherwise leave it empty. **Your Colibri API key is not forwarded to Ollama.** Local Ollama does not require a key. Configuring remote HTTP Ollama requires the existing explicit `sbcCode.allowInsecureRemote` option; prefer HTTPS.
+
+### Example VS Code settings
+
+```json
+{
+  "sbcCode.provider": "ollama",
+  "sbcCode.ollamaBaseUrl": "http://127.0.0.1:11434",
+  "sbcCode.ollamaModel": "",
+  "sbcCode.inlineSuggestions": false
+}
+```
+
+Use the **Refresh Models** action after pulling a new Ollama model. Switching providers clears the current in-memory chat history to avoid mixing contexts from different backends. Existing explicit file-edit approvals, diffs, rollback and workspace protections remain in force.
 
 ## Features
 

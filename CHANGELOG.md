@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 — Ollama provider
+
+- Add Ollama as a first-class provider in the SBC Code sidebar, alongside Colibri.
+- Discover installed Ollama models through `/api/tags`; use the OpenAI-compatible `/v1/chat/completions` for Chat, Streaming, Agent tools and inline completions.
+- Persist provider choice and model selection separately for each backend.
+- Give Ollama its own configurable URL and optional model override.
+- Exclude the unsupported `tool_choice` parameter in Ollama Agent requests.
+- Keep the Colibri API key isolated from Ollama and retain local-first endpoint security.
+- Add native Ollama endpoint parsing tests and HTTP integration tests against an Ollama-shaped local server.
+
+
 ## 0.6.1 — official SBC icon
 
 - Use the original SBC organization logo as the VSIX/extension listing icon (`media/sbc-logo.png`).

@@ -1,8 +1,8 @@
 {
   "name": "sbc-code",
   "displayName": "SBC Code",
-  "description": "Local-first VS Code coding agent with Colibri and verified GitHub Release updates.",
-  "version": "0.6.1",
+  "description": "Local-first coding agent for VS Code with Colibri and Ollama providers, tool calling and safe edits.",
+  "version": "0.7.0",
   "publisher": "sbc-apps",
   "license": "UNLICENSED",
   "private": true,
@@ -147,12 +147,12 @@
         "sbcCode.baseUrl": {
           "type": "string",
           "default": "http://127.0.0.1:8000/v1",
-          "description": "Base URL of a Colibri or OpenAI-compatible API server. API keys are stored separately in VS Code SecretStorage."
+          "description": "Base URL for Colibri/OpenAI-compatible provider. Ollama has its own sbcCode.ollamaBaseUrl."
         },
         "sbcCode.model": {
           "type": "string",
           "default": "",
-          "description": "Optional model ID override. Leave empty to use the model selected in the sidebar."
+          "description": "Optional fixed model ID for Colibri/OpenAI-compatible providers. Leave empty to use the sidebar picker."
         },
         "sbcCode.maxTokens": {
           "type": "integer",
@@ -189,6 +189,29 @@
           "type": "boolean",
           "default": true,
           "description": "Check official SBC Code GitHub Releases when VS Code starts and every six hours, and notify when a newer stable version is available. No source code is sent."
+        },
+        "sbcCode.provider": {
+          "type": "string",
+          "default": "colibri",
+          "enum": [
+            "colibri",
+            "ollama"
+          ],
+          "enumDescriptions": [
+            "Colibri or another OpenAI-compatible server",
+            "Ollama local model server"
+          ],
+          "description": "AI inference provider used for Chat, Agent, edits and inline code completions."
+        },
+        "sbcCode.ollamaBaseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434",
+          "description": "Ollama server origin. Accepts http://127.0.0.1:11434 or an endpoint ending in /v1. Non-local servers require HTTPS unless explicitly allowed."
+        },
+        "sbcCode.ollamaModel": {
+          "type": "string",
+          "default": "",
+          "description": "Optional fixed Ollama model name, e.g. qwen3-coder:latest. Leave empty to use the sidebar's model selection."
         }
       }
     }

@@ -8,6 +8,7 @@
   const attach = document.getElementById('attach');
   const agent = document.getElementById('agent');
   const models = document.getElementById('model');
+  const provider = document.getElementById('provider');
   const status = document.getElementById('status');
   const errorBox = document.getElementById('error');
   const send = document.getElementById('send');
@@ -213,6 +214,11 @@
       post('setModel', { model: models.value });
     }
   });
+  provider.addEventListener('change', function () {
+    if (provider.value === 'colibri' || provider.value === 'ollama') {
+      post('setProvider', { provider: provider.value });
+    }
+  });
 
   window.addEventListener('message', function (event) {
     const data = event.data;
@@ -221,6 +227,9 @@
     }
     switch (data.type) {
       case 'models': {
+        if (data.provider === 'ollama' || data.provider === 'colibri') {
+          provider.value = data.provider;
+        }
         const selected = data.selected || '';
         const all = Array.isArray(data.models) ? data.models.slice() : [];
         if (selected && all.indexOf(selected) === -1) {

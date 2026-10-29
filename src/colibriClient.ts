@@ -1,4 +1,5 @@
 import type { AgentToolMessage, ToolAssistantReply } from './agentTypes';
+import { DEFAULT_OLLAMA_URL, ModelProvider, ollamaChatBase, ollamaNativeBase, parseOllamaModelIds } from './modelProviders';
 export type ChatRole = 'system' | 'user' | 'assistant';
 
 export interface ChatMessage {
@@ -14,6 +15,8 @@ export interface CompletionOptions {
 
 export interface ApiConfiguration {
   baseUrl: string;
+  provider?: ModelProvider;
+  ollamaBaseUrl?: string;
   allowInsecureRemote: boolean;
 }
 
@@ -128,6 +131,12 @@ export class ColibriClient {
   ) {}
 
   async models(signal?: AbortSignal): Promise<string[]> {
+    const provider = this.readConfiguration().provider ?? 'colibri';
+    if (provider === 'ollama') {
+      const response = await this.request('tags', { method: 'GET', signal }, true);
+      await this.throwOnError(response);
+      return parseOllamaModelIds(await response.json());
+    }
     const response = await this.request('models', { method: 'GET', signal });
     await this.throwOnError(response);
     return parseModelIds(await response.json());
@@ -163,7 +172,7 @@ export class ColibriClient {
         model,
         messages,
         tools,
-        tool_choice: 'auto',
+        ...(this.readConfiguration().provider === 'ollama' ? {} : { tool_choice: 'auto' }),
         stream: false,
         max_tokens: options.maxTokens,
         temperature: options.temperature,
@@ -302,10 +311,17 @@ export class ColibriClient {
     };
   }
 
-  private async request(endpoint: string, options: RequestInit): Promise<Response> {
+  private async request(endpoint: string, options: RequestInit, nativeOllama = false): Promise<Response> {
     const configuration = this.readConfiguration();
-    const url = buildEndpoint(configuration.baseUrl, endpoint, configuration.allowInsecureRemote);
-    const key = await this.readApiKey();
+    const provider = configuration.provider ?? 'colibri';
+    const baseUrl = provider === 'ollama'
+      ? nativeOllama
+        ? ollamaNativeBase(configuration.ollamaBaseUrl ?? DEFAULT_OLLAMA_URL)
+        : ollamaChatBase(configuration.ollamaBaseUrl ?? DEFAULT_OLLAMA_URL)
+      : configuration.baseUrl;
+    const url = buildEndpoint(baseUrl, endpoint, configuration.allowInsecureRemote);
+    // Do not expose a configured Colibri API key to an Ollama server when switching providers.
+    const key = provider === 'ollama' ? undefined : await this.readApiKey();
     const headers: Record<string, string> = { Accept: 'application/json, text/event-stream' };
     if (options.method === 'POST') {
       headers['Content-Type'] = 'application/json';
@@ -320,7 +336,10 @@ export class ColibriClient {
         throw error;
       }
       const detail = error instanceof Error ? error.message : String(error);
-      throw new Error('Could not reach Colibri at ' + configuration.baseUrl + '. Start the server and check sbcCode.baseUrl. ' + detail);
+      const hint = provider === 'ollama'
+        ? 'Ollama (' + (configuration.ollamaBaseUrl ?? DEFAULT_OLLAMA_URL) + '). Start Ollama and check sbcCode.ollamaBaseUrl. '
+        : 'Colibri (' + configuration.baseUrl + '). Start the server and check sbcCode.baseUrl. ';
+      throw new Error('Could not reach ' + hint + detail);
     }
   }
 
