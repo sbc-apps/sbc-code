@@ -555,7 +555,10 @@ export class AgentTools {
       })),
     );
     return JSON.stringify({
-      applied: true, files: proposals.map((item) => item.relative),
+      applied: true,
+      files: proposals.map((item) => item.relative),
+      created: proposals.filter((item) => !item.exists).map((item) => item.relative),
+      modified: proposals.filter((item) => item.exists).map((item) => item.relative),
       checkpointSaved,
       note: checkpointSaved
         ? 'Edits applied. Use SBC Code: Restore Last AI Edit to undo this batch.'

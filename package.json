@@ -1,8 +1,8 @@
 {
   "name": "sbc-code",
   "displayName": "SBC Code",
-  "description": "Local-first coding agent for VS Code with Colibri and Ollama providers, tool calling and safe edits.",
-  "version": "0.7.1",
+  "description": "Local-first VS Code agent with verified file-write receipts, Colibri/Ollama, reviewed edits and safe rollbacks.",
+  "version": "0.8.0",
   "publisher": "sbc-apps",
   "license": "UNLICENSED",
   "private": true,

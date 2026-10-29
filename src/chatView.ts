@@ -48,6 +48,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
+  private workspaceStatus(): { name: string; ready: boolean } {
+    const folders = vscode.workspace.workspaceFolders;
+    const ready = vscode.workspace.isTrusted &&
+      folders?.length === 1 && folders[0].uri.scheme === 'file';
+    return {
+      name: folders?.map((folder) => folder.name).join(', ') || 'No folder opened',
+      ready: ready === true,
+    };
+  }
+
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
     view.webview.options = {
@@ -70,6 +80,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
     this.post({ type: 'models', models: this.models, selected: this.getModel(), provider: readSettings().provider });
     this.post({ type: 'attachments', files: this.fileAttachments.list() });
+    this.post({ type: 'workspace', ...this.workspaceStatus() });
     void this.refreshModels();
   }
 
@@ -184,6 +195,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     switch (input.type) {
       case 'ready':
         this.post({ type: 'models', models: this.models, selected: this.getModel(), provider: readSettings().provider });
+        this.post({ type: 'workspace', ...this.workspaceStatus() });
         break;
       case 'send':
         if (typeof input.prompt === 'string') {
@@ -204,6 +216,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.post({ type: 'attachments', files: this.fileAttachments.list() });
         }
         break;
+      case 'openFolder': {
+        const selected = await vscode.window.showOpenDialog({
+          title: 'SBC Code: Select Workspace Folder',
+          canSelectFiles: false, canSelectFolders: true, canSelectMany: false,
+        });
+        if (selected?.[0]) {
+          await vscode.commands.executeCommand('vscode.openFolder', selected[0], false);
+        }
+        break;
+      }
       case 'refreshModels':
         await this.refreshModels();
         break;
@@ -283,6 +305,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.post({ type: 'error', message: 'A request is still running. Stop it first.' });
       return;
     }
+    if (agentMode && !this.workspaceStatus().ready) {
+      this.post({ type: 'workspace', ...this.workspaceStatus() });
+      this.post({ type: 'error', message: 'Agent mode needs one trusted local workspace folder. Choose Open Folder in the SBC Code panel.' });
+      return;
+    }
     const prompt = input.trim();
     if (!prompt || prompt.length > MAX_PROMPT_CHARS) {
       this.post({ type: 'error', message: 'Enter a prompt of at most ' + MAX_PROMPT_CHARS + ' characters.' });
@@ -327,6 +354,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.post({ type: 'attachments', files: [] });
     this.post({ type: 'user', text: visiblePrompt });
     this.post({ type: 'start', mode: agentMode ? 'Agent' : 'Chat' });
+    this.post({ type: 'writeReport', created: [], modified: [], attempted: 0, mode: agentMode ? 'Agent' : 'Chat' });
 
     try {
       const previous = this.recentHistory();
@@ -336,13 +364,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           ...previous.map((entry) => ({ role: entry.role, content: entry.content })),
           { role: 'user', content: userContent },
         ];
-        answer = await this.agent.run(
+        const execution = await this.agent.run(
           model, messages, settings.maxTokens, settings.temperature, controller.signal,
           (activity) => this.post({
             type: 'activity', state: activity.state, step: activity.step,
             id: activity.id, result: activity.result,
           }),
+          (report) => this.post({
+            type: 'writeReport', mode: 'Agent', created: report.created,
+            modified: report.modified, attempted: report.writeToolsAttempted,
+          }),
         );
+        answer = execution.text;
+        this.post({
+          type: 'writeReport', mode: 'Agent',
+          created: execution.files.created, modified: execution.files.modified,
+          attempted: execution.files.writeToolsAttempted,
+        });
         this.post({ type: 'delta', text: answer });
       } else {
         const messages: ChatMessage[] = [
@@ -407,16 +445,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       '<div class="models"><label for="model">Model</label><select id="model" aria-label="Select model"><option value="">Select a model</option></select>',
       '<button id="refresh" type="button" title="Refresh models" aria-label="Refresh models">↻</button></div>',
       '<div id="status" role="status">Connecting…</div>',
+      '<div id="workspace" class="workspace-status" aria-live="polite"></div>',
       '<div id="error" role="alert" hidden></div>',
       '<section id="messages" aria-label="Conversation" aria-live="polite">',
       '<div class="empty">Ask about code, or enable Agent to inspect your workspace, propose edits, and run approved checks.</div>',
       '</section>',
       '<form id="composer"><div class="mode-controls">',
-      '<label class="mode"><input id="agent" type="checkbox"> Agent mode</label>',
+      '<label class="mode"><input id="agent" type="checkbox" checked> Agent mode (file changes need approval)</label>',
       '<label class="context"><input id="attach" type="checkbox"> Attach selection</label>',
       '<button id="attach-files" class="attach-files" type="button" title="Attach up to 3 local code files">+ File</button>',
       '</div>',
       '<div id="attachments" class="attachments" aria-live="polite" hidden></div>',
+      '<div id="write-report" class="write-report" role="status">No files have been changed in this conversation.</div>',
       '<textarea id="prompt" rows="3" maxlength="12000" aria-label="Message" placeholder="Ask SBC Code to build, explain or fix…"></textarea>',
       '<div class="composer-actions"><span class="hint">Enter to send · Shift+Enter for newline</span>',
       '<button id="stop" type="button" hidden>Stop</button><button id="send" type="submit">Send</button></div>',
