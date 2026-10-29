@@ -7,6 +7,7 @@ import { captureSelection, readSettings } from './config';
 import { EditSelectionController } from './editSelection';
 import { registerInlineCompletion } from './inlineCompletion';
 import { EditCheckpoints } from './editCheckpoints';
+import { ReleaseUpdates } from './releaseUpdates';
 
 const SECRET_KEY = 'sbcCode.apiKey';
 
@@ -26,6 +27,8 @@ export function activate(context: vscode.ExtensionContext): void {
     () => Promise.resolve(context.secrets.get(SECRET_KEY)),
   );
 
+  const releaseUpdates = new ReleaseUpdates(context);
+  context.subscriptions.push(releaseUpdates);
   const checkpoints = new EditCheckpoints(context);
   const agentTools = new AgentTools(context, checkpoints);
   const agent = new AgentRunner(client, agentTools);
@@ -55,6 +58,7 @@ export function activate(context: vscode.ExtensionContext): void {
     await vscode.commands.executeCommand('sbcCode.chatView.focus');
   });
   register('sbcCode.refreshModels', () => chat.refreshModels());
+  register('sbcCode.checkForUpdates', () => releaseUpdates.check(true));
   register('sbcCode.selectModel', () => chat.chooseModel());
   register('sbcCode.editSelection', () => edits.run());
   register('sbcCode.restoreLastEdit', () => checkpoints.restoreLast());

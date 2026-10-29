@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0 — GitHub Releases and updates
+
+- Automatically publish stable GitHub Releases from successful trusted main-branch CI using SBC self-hosted runners.
+- Attach versioned VSIX and a SHA-256 checksum file; avoid overwriting published releases.
+- Check for new stable releases on startup, every six hours, or via **Check for Updates**.
+- Notify once per release, with **Install Update**, **View Release**, and **Later** actions.
+- Verify the official VSIX asset's SHA-256 digest and size before installing with VS Code's built-in VSIX installer.
+- Add optional update notifications setting and updater regression tests.
+
+
 ## 0.5.0 — development
 
 - Add a read-only `get_diagnostics` Agent tool for TypeScript, ESLint and other VS Code Problems within the trusted workspace.
