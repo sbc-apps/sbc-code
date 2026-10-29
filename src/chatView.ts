@@ -8,6 +8,7 @@ import { FileAttachments } from './fileAttachments';
 import { parseFileMentions } from './fileContextText';
 import { getWorkspaceDiagnostics } from './diagnostics';
 import { diagnosticsForAgent, summarizeDiagnostics } from './diagnosticContext';
+import { ModelProvider } from './modelProviders';
 
 const SYSTEM_PROMPT = [
   'You are SBC Code, a local-first programming assistant.',
@@ -27,7 +28,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private view?: vscode.WebviewView;
   private models: string[] = [];
-  private selectedModel: string;
+  private readonly selectedModels: Record<ModelProvider, string>;
+  private activeProvider: ModelProvider;
   private history: ChatMessage[] = [];
   private currentRequest?: AbortController;
   private readonly fileAttachments = new FileAttachments();
@@ -37,7 +39,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly client: ColibriClient,
     private readonly agent: AgentRunner,
   ) {
-    this.selectedModel = context.globalState.get<string>('sbcCode.selectedModel', '');
+    this.activeProvider = readSettings().provider;
+    this.selectedModels = {
+      colibri: context.globalState.get<string>('sbcCode.selectedModel.colibri',
+        context.globalState.get<string>('sbcCode.selectedModel', '')),
+      ollama: context.globalState.get<string>('sbcCode.selectedModel.ollama', ''),
+    };
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -60,27 +67,49 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.currentRequest?.abort();
       this.view = undefined;
     });
-    this.post({ type: 'models', models: this.models, selected: this.getModel() });
+    this.post({ type: 'models', models: this.models, selected: this.getModel(), provider: readSettings().provider });
     this.post({ type: 'attachments', files: this.fileAttachments.list() });
     void this.refreshModels();
   }
 
   getModel(): string {
-    return readSettings().model || this.selectedModel;
+    const settings = readSettings();
+    return (settings.provider === 'ollama' ? settings.ollamaModel : settings.model) ||
+      this.selectedModels[settings.provider];
+  }
+
+  /** A provider change never reuses model names or chat history from a different backend. */
+  async onProviderSettingsChanged(): Promise<void> {
+    const provider = readSettings().provider;
+    if (this.activeProvider !== provider) {
+      this.currentRequest?.abort();
+      this.activeProvider = provider;
+      this.history = [];
+      this.models = [];
+      this.post({ type: 'cleared' });
+    }
+    await this.refreshModels();
   }
 
   async refreshModels(): Promise<void> {
-    this.post({ type: 'status', message: 'Connecting to model server…' });
+    const provider = readSettings().provider;
+    this.post({ type: 'status', message: 'Connecting to ' + (provider === 'ollama' ? 'Ollama' : 'Colibri') + '…' });
     try {
       const available = await this.client.models();
+      if (readSettings().provider !== provider) {
+        return;  // Ignore a response from the provider we switched away from.
+      }
       this.models = available;
       if (!this.getModel() && available.length > 0) {
         await this.setModel(available[0]);
       }
-      this.post({ type: 'models', models: available, selected: this.getModel() });
-      this.post({ type: 'status', message: available.length + ' model(s) available' });
+      this.post({ type: 'models', models: available, selected: this.getModel(), provider });
+      this.post({ type: 'status', message: available.length + ' ' + provider + ' model(s) available' });
     } catch (error) {
-      this.post({ type: 'status', message: 'Model server offline or unavailable' });
+      if (readSettings().provider !== provider) {
+        return;
+      }
+      this.post({ type: 'status', message: provider + ' server offline or unavailable' });
       this.post({ type: 'error', message: readableError(error) });
     }
   }
@@ -89,7 +118,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!this.models.length) {
       const input = await vscode.window.showInputBox({
         title: 'SBC Code: Model ID',
-        prompt: 'Enter the model ID reported by your Colibri server',
+        prompt: 'Enter the model ID reported by your ' + (readSettings().provider === 'ollama' ? 'Ollama' : 'Colibri') + ' server',
         value: this.getModel(),
         ignoreFocusOut: true,
       });
@@ -153,7 +182,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const input = message as Record<string, unknown>;
     switch (input.type) {
       case 'ready':
-        this.post({ type: 'models', models: this.models, selected: this.getModel() });
+        this.post({ type: 'models', models: this.models, selected: this.getModel(), provider: readSettings().provider });
         break;
       case 'send':
         if (typeof input.prompt === 'string') {
@@ -182,6 +211,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           await this.setModel(input.model);
         }
         break;
+      case 'setProvider':
+        if (input.provider === 'colibri' || input.provider === 'ollama') {
+          if (this.currentRequest) {
+            throw new Error('Stop the running response before switching model servers.');
+          }
+          if (readSettings().provider !== input.provider) {
+            await vscode.workspace.getConfiguration('sbcCode').update(
+              'provider', input.provider, vscode.ConfigurationTarget.Global,
+            );
+            await this.onProviderSettingsChanged();
+          }
+        }
+        break;
       case 'setApiKey':
         await vscode.commands.executeCommand('sbcCode.setApiKey');
         break;
@@ -207,9 +249,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async setModel(model: string): Promise<void> {
-    this.selectedModel = model.trim();
-    await this.context.globalState.update('sbcCode.selectedModel', this.selectedModel);
-    this.post({ type: 'models', models: this.models, selected: this.getModel() });
+    const provider = readSettings().provider;
+    this.selectedModels[provider] = model.trim();
+    await this.context.globalState.update('sbcCode.selectedModel.' + provider, this.selectedModels[provider]);
+    this.post({ type: 'models', models: this.models, selected: this.getModel(), provider });
   }
 
   private recentHistory(): ChatMessage[] {
@@ -357,6 +400,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       '<button id="restore" type="button" title="Review and restore last AI edit">Undo edit</button>',
       '<button id="clear" type="button" title="Clear conversation">Clear</button>',
       '<button id="key" type="button" title="Set API key">Key</button></div></header>',
+      '<div class="models"><label for="provider">Provider</label><select id="provider" aria-label="Select AI provider">',
+      '<option value="colibri">Colibri / Compatible</option><option value="ollama">Ollama (Local)</option></select></div>',
       '<div class="models"><label for="model">Model</label><select id="model" aria-label="Select model"><option value="">Select a model</option></select>',
       '<button id="refresh" type="button" title="Refresh models" aria-label="Refresh models">↻</button></div>',
       '<div id="status" role="status">Connecting…</div>',

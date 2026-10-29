@@ -22,7 +22,11 @@ export function activate(context: vscode.ExtensionContext): void {
   const client = new ColibriClient(
     () => {
       const settings = readSettings();
-      return { baseUrl: settings.baseUrl, allowInsecureRemote: settings.allowInsecureRemote };
+      return {
+        baseUrl: settings.baseUrl, provider: settings.provider,
+        ollamaBaseUrl: settings.ollamaBaseUrl,
+        allowInsecureRemote: settings.allowInsecureRemote,
+      };
     },
     () => Promise.resolve(context.secrets.get(SECRET_KEY)),
   );
@@ -89,8 +93,10 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
-    if (event.affectsConfiguration('sbcCode.baseUrl')) {
-      void chat.refreshModels();
+    if (event.affectsConfiguration('sbcCode.baseUrl') ||
+        event.affectsConfiguration('sbcCode.ollamaBaseUrl') ||
+        event.affectsConfiguration('sbcCode.provider')) {
+      void chat.onProviderSettingsChanged();
     }
   }));
 }
