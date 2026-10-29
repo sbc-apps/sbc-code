@@ -12,6 +12,7 @@ export interface SbcSettings {
   temperature: number;
   maxContextChars: number;
   allowInsecureRemote: boolean;
+  agentMaxSteps: number;
 }
 
 export function readSettings(): SbcSettings {
@@ -22,10 +23,11 @@ export function readSettings(): SbcSettings {
     ollamaBaseUrl: config.get<string>('ollamaBaseUrl', DEFAULT_OLLAMA_URL),
     ollamaModel: config.get<string>('ollamaModel', '').trim(),
     model: config.get<string>('model', '').trim(),
-    maxTokens: config.get<number>('maxTokens', 1024),
+    maxTokens: config.get<number>('maxTokens', 2048),
     temperature: config.get<number>('temperature', 0.2),
     maxContextChars: config.get<number>('maxContextChars', 12000),
     allowInsecureRemote: config.get<boolean>('allowInsecureRemote', false),
+    agentMaxSteps: Math.min(25, Math.max(1, Math.floor(config.get<number>('agentMaxSteps', 8)))),
   };
 }
 

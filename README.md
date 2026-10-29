@@ -1,367 +1,344 @@
 <div align="center">
 
-<img src="media/sbc-logo.png" alt="SBC logo" width="100" height="100">
+<img src="media/sbc-logo.png" alt="SBC logo" width="96" height="96">
 
 # SBC Code
 
-### Local-first AI coding agent for Visual Studio Code
+### The local-first AI coding agent for Visual Studio Code
 
-**Work with your codebase. Generate files. Make targeted edits. Run approved checks.**
+**Chat with your code. Let the Agent read, create and fix files. See exactly what was saved.**
 
-Connect VS Code to your own AI models through **Ollama**, **Colibri**, or a compatible OpenAI-style endpoint. SBC Code combines a lightweight coding chat with a tool-using agent that can inspect your workspace, modify source files, and report what was actually saved.
+Run on your own models with **Ollama**, **Colibri** or any OpenAI-compatible server. Your code goes only to the endpoint you choose, and SBC Code keeps itself up to date with verified releases.
 
 [![CI](https://github.com/sbc-apps/sbc-code/actions/workflows/ci.yml/badge.svg)](https://github.com/sbc-apps/sbc-code/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/sbc-apps/sbc-code?label=GitHub%20Release)](https://github.com/sbc-apps/sbc-code/releases/latest)
-![VS Code](https://img.shields.io/badge/VS%20Code-%3E%3D%201.90-007ACC)
+[![Latest release](https://img.shields.io/github/v/release/sbc-apps/sbc-code?label=release&color=0098EA)](https://github.com/sbc-apps/sbc-code/releases/latest)
+![VS Code](https://img.shields.io/badge/VS%20Code-%E2%89%A5%201.90-007ACC)
+![Models](https://img.shields.io/badge/models-Ollama%20%7C%20Colibri%20%7C%20OpenAI--compatible-0098EA)
 
-[**Download the latest release**](https://github.com/sbc-apps/sbc-code/releases/latest) ·
-[**Quick start**](#quick-start) ·
-[**Features**](#capabilities) ·
-[**Configuration**](#configuration)
+[**Download latest**](https://github.com/sbc-apps/sbc-code/releases/latest/download/sbc-code.vsix) ·
+[**Quick start**](#-quick-start) ·
+[**Features**](#-features) ·
+[**Automatic updates**](#-automatic-updates) ·
+[**Configuration**](#%EF%B8%8F-configuration) ·
+[**Development**](#-development)
 
 </div>
 
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/splash.png" alt="Animated SBC Code splash screen while connecting to the model server" width="260"><br><sub><b>Animated splash</b> · live startup checks</sub></td>
+    <td align="center" width="33%"><img src="docs/images/sidebar.png" alt="SBC Code sidebar with provider switch, model picker and suggestions" width="260"><br><sub><b>Sidebar</b> · provider, model, workspace</sub></td>
+    <td align="center" width="33%"><img src="docs/images/agent.png" alt="Agent run with activity timeline, code block, file receipt and update banner" width="260"><br><sub><b>Agent</b> · activity, receipts, updates</sub></td>
+  </tr>
+</table>
+
 ---
 
-> [!IMPORTANT]
-> **Development status — v0.9.0.** SBC Code is an experimental extension, not a fully verified replacement for Codex, Claude Code, or GitHub Copilot. Tool calling, code quality, and response time depend on the selected model and inference server. Automated tests cover the extension and mocked server protocols; a complete real-model VS Code compatibility matrix is not yet available.
+> [!NOTE]
+> **v1.0.0.** Results depend on the model you choose. Use a coding model with **tool calling** for multi-step Agent work. Smaller models work well for chat and single-file generation. Keep your projects under Git.
 
-## Why SBC Code?
+## ✨ Why SBC Code
 
-A coding assistant should do more than produce snippets in a conversation. SBC Code is designed around **workspace actions with observable results**:
+| | |
+| --- | --- |
+| 🔒 **You own the inference** | Ollama, Colibri or any OpenAI-compatible endpoint. Localhost by default; remote HTTP is blocked unless you allow it. |
+| 🛠️ **Real workspace actions** | The Agent lists, searches and reads files, checks VS Code Problems, makes exact patches and creates files, all inside one trusted folder. |
+| ✅ **Verified results** | Each Agent run ends with a **Created / Modified** receipt built from what was actually saved to disk, not from what the model claims. |
+| ↩️ **Safe to experiment** | Every AI edit is checkpointed. Restore the last one with conflict detection, or switch to diff review for each change. |
+| ⚡ **Fast** | Batched streaming, debounced and cached inline suggestions, and a splash that closes as soon as your server answers. |
+| 🔄 **Always current** | New stable releases are downloaded, checked against their SHA-256 and installed automatically. You only reload. |
 
-- **Use local models.** Switch between Ollama and Colibri without changing coding tools or transferring your Colibri API key to Ollama.
-- **Work in real project files.** The Agent can inspect source, create files, and perform exact edits in a trusted local workspace.
-- **See what changed.** A file receipt distinguishes **Created**, **Modified**, and **No files created or modified**. A model's written claim is never treated as proof of a successful save.
-- **Control write behavior.** Automatically save workspace edits by default, or enable explicit Diff review. Terminal/test commands always require separate confirmation.
-- **Recover changes.** Use in-session edit checkpoints to review and restore the most recent AI changes.
-- **Stay up to date.** Check signed-off stable GitHub Releases from inside the extension and verify downloaded VSIX assets with SHA-256 before installation.
+## 🚀 Quick start
 
-## Capabilities
+### 1. Install
 
-| Area | Available in v0.9.0 | Notes |
-| --- | --- | --- |
-| **AI Chat** | Streaming chat with cancellation, selectable models, code blocks, and copy actions | Conversation is held in extension memory |
-| **Agent Mode** | File discovery, workspace search, bounded reads, multi-file edits, and tool activity | Requires a trusted, single-folder local workspace |
-| **Automatic file edits** | Create/edit files and verify saved content on disk | Default; can switch to manual review |
-| **Exact patching** | Unique, literal find/replace snippets with overlap and stale-source checks | Useful for targeted changes to existing files |
-| **Small-model fallback** | Limited generation-to-file flow for an explicit single-file request | Does not replace reliable multi-step tool calling |
-| **VS Code Problems** | Read diagnostics and request fixes for an active file | Uses VS Code language-service diagnostics |
-| **Editor actions** | Explain Selection, Edit Selection, and Fix Current File Diagnostics | Available through commands/context menus |
-| **Context** | Attach selected code, up to three files, or reference `@file(path)` | Attachments are explicit and size-limited |
-| **Inline completion** | Optional AI ghost-text suggestions | Experimental; disabled by default |
-| **Undo** | In-session, conflict-checked restore of recent AI edits | Not a substitute for Git/version control |
-| **Verification** | Approved test/build commands, GitHub Actions CI, versioned VSIX releases | No unrestricted autonomous terminal access |
+SBC Code is distributed through [GitHub Releases](https://github.com/sbc-apps/sbc-code/releases). This link always points to the **latest** version:
 
-### How the agent works
+**[⬇ Download sbc-code.vsix (latest)](https://github.com/sbc-apps/sbc-code/releases/latest/download/sbc-code.vsix)**
 
-```text
-Your request in VS Code
-          |
-          v
-   SBC Code Chat / Agent
-          |
-          v
- Ollama / Colibri / compatible model server
-          |
-          v
- Agent tools (trusted workspace only)
-          |
-          +-- list / search / read source
-          +-- inspect VS Code diagnostics
-          +-- propose exact patches or files
-          +-- run allowlisted checks (with confirmation)
-          |
-          v
- VS Code WorkspaceEdit -> save -> verify
-          |
-          v
- Created / Modified receipt + session Undo
-```
+In VS Code, open **Extensions → … → Install from VSIX…**, select the downloaded file and reload.
 
-The inference service receives the prompts and tool-result context necessary for the request. Source files are not magically private when you select a remote endpoint; review the [privacy model](#privacy-and-security) before using one.
-
-## Quick start
-
-### 1. Install the extension
-
-Download the current `sbc-code-X.Y.Z.vsix` from the [official Releases page](https://github.com/sbc-apps/sbc-code/releases/latest).
-
-In Visual Studio Code:
-
-1. Open **Extensions**.
-2. Select **More Actions (…) → Install from VSIX…**.
-3. Choose the downloaded `.vsix` file.
-4. Run **Developer: Reload Window** if prompted.
-
-You do not need Node.js to install the prebuilt VSIX. Node.js is needed for building from source.
-
-### 2. Open your workspace
-
-Use **File → Open Folder…** and select the project directory you want SBC Code to work in. Trust it only if you trust its contents. The SBC Code panel displays the active workspace and offers **Open Folder** when none is ready.
-
-> Agent file operations currently require **one trusted local workspace folder**. Multi-root and remote workspace support are not implemented.
-
-### 3. Connect a model provider
-
-In the **SBC Code** panel, choose a **Provider**, refresh the available models, and select a model.
-
-| Provider | Default endpoint | Model discovery |
-| --- | --- | --- |
-| **Ollama (Local)** | `http://127.0.0.1:11434` | Native `GET /api/tags` |
-| **Colibri / Compatible** | `http://127.0.0.1:8000/v1` | OpenAI-compatible `GET /v1/models` |
-
-The chat, inline completion, and Agent use the selected provider. Advanced Agent workflows work best with a **coding model that supports tool calling**, not just conversational text generation.
-
-### 4. Ask SBC Code to do something
-
-**Create a file:**
-
-```text
-Create a complete, responsive calculator website in index.html
-inside the current workspace. Save the actual file, then tell me
-which files were created or modified.
-```
-
-**Modify existing code:**
-
-```text
-Inspect src/app.ts. Improve its error handling without changing
-unrelated behavior, and run the available checks if I approve.
-```
-
-**Investigate errors:**
-
-```text
-Read the current VS Code Problems for this file, identify the
-underlying causes, and apply focused corrections.
-```
-
-With **Agent mode** on, successful writes appear in the file receipt and can be opened directly from the sidebar. If the receipt says **No files created or modified**, no successful save was confirmed—even if the model wrote code or claimed it created a file.
-
-## Model providers
-
-### Ollama
-
-Install [Ollama](https://ollama.com/) and pull a model that suits your hardware and task:
+Or install the latest release from a terminal:
 
 ```bash
-ollama pull qwen3-coder
-ollama list
+# macOS / Linux
+curl -fL -o /tmp/sbc-code.vsix https://github.com/sbc-apps/sbc-code/releases/latest/download/sbc-code.vsix
+code --install-extension /tmp/sbc-code.vsix
 ```
 
-Ollama normally runs as a background service. If it is not already running, start it with:
+```powershell
+# Windows (PowerShell)
+Invoke-WebRequest https://github.com/sbc-apps/sbc-code/releases/latest/download/sbc-code.vsix -OutFile "$env:TEMP\sbc-code.vsix"
+code --install-extension "$env:TEMP\sbc-code.vsix"
+```
+
+Each release also carries the versioned `sbc-code-X.Y.Z.vsix` and its `.sha256` checksum if you want to pin or verify a specific version. You install once. After that, SBC Code [updates itself](#-automatic-updates) from the latest GitHub Release.
+
+### 2. Start a model server
+
+<details open>
+<summary><b>Ollama</b> (recommended for most machines)</summary>
 
 ```bash
-ollama serve
+ollama pull qwen3-coder     # or any model that fits your hardware
+ollama serve                # skip if Ollama already runs as a service
 ```
 
-Choose **Ollama (Local)** in SBC Code. The extension uses Ollama's native tags endpoint to discover installed models and the OpenAI-compatible `/v1/chat/completions` endpoint for chat, streaming, and supported tools. Model support for tool calls varies; a general-purpose model may answer with code instead of invoking the editing tools.
+SBC Code discovers installed models via `GET /api/tags`, and uses `/v1/chat/completions` for chat, streaming and tools.
 
-For Ollama on another machine, change `sbcCode.ollamaBaseUrl`. The extension blocks unencrypted remote HTTP by default; use HTTPS when possible.
+</details>
 
-### Colibri and compatible servers
-
-[Colibri](https://github.com/JustVugg/colibri) is a local inference engine. Follow its upstream instructions to install and run a supported model:
+<details>
+<summary><b>Colibri</b> or another OpenAI-compatible server</summary>
 
 ```bash
 git clone https://github.com/JustVugg/colibri.git
-cd colibri
-./start-here.sh
+cd colibri && ./start-here.sh
 ```
 
-In SBC Code, choose **Colibri / Compatible** and configure `sbcCode.baseUrl` if your server uses a different address. The default is `http://127.0.0.1:8000/v1`. Other OpenAI-compatible servers may work, but compatibility depends on their chat, streaming, and tool-call implementations.
+The default endpoint is `http://127.0.0.1:8000/v1`; change it with `sbcCode.baseUrl`. If your server needs a key, run **SBC Code: Set API Key**. The key is stored in VS Code SecretStorage and is never sent to Ollama.
 
-If your compatible endpoint requires an API key, use **SBC Code: Set API Key**. The key is stored in VS Code **SecretStorage** rather than plain-text extension settings. A Colibri API key is not forwarded to the Ollama provider.
+</details>
 
-## Chat, Agent and editing policies
+### 3. Open a folder and go
 
-### Chat vs Agent
+1. **File → Open Folder…** and trust the folder (the Agent works in one trusted local folder).
+2. Click the **SBC** icon in the Activity Bar. The splash screen checks the engine, your provider and your workspace.
+3. Pick **Colibri** or **Ollama**, choose a model, and ask:
 
-**Chat** is for explanations, questions, and generated text. A code block in a chat response is **not** a newly created file.
-
-**Agent** can invoke workspace tools, including file writes. Agent mode is enabled by default for new conversations, but a trusted local folder must be open before it can work on source files.
-
-### Automatic vs review mode
-
-The default is **Automatic**:
-
-```json
-{
-  "sbcCode.agentEditMode": "automatic"
-}
+```text
+Create a responsive landing page in index.html with a pricing section.
 ```
 
-The Agent can apply and save changes within the trusted workspace without requesting approval for every file. The extension validates paths and checks editor content before editing. **This is a powerful setting:** review file receipts, test generated code, and keep your project under version control.
-
-If you want to inspect each proposed change first:
-
-```json
-{
-  "sbcCode.agentEditMode": "review"
-}
+```text
+Read the current Problems in src/app.ts and fix them with minimal changes.
 ```
 
-Review mode opens a VS Code Diff and requires **Approve File** before an edit. The editing policy applies to Agent edits and **Edit Selection**. Neither mode grants silent execution of terminal commands.
+```text
+Find the main untested module in this workspace and add focused unit tests.
+```
 
-### Tools and practical limits
+## 🧩 Features
 
-The current Agent toolset includes:
+### Sidebar
 
-| Tool | Purpose |
+- **Animated interface** built with [Animate UI](https://animate-ui.com) and [Motion](https://motion.dev). Icons animate on hover, and it follows your VS Code theme (light, dark or high contrast) and the system *reduce motion* setting.
+- **Splash screen** shows live startup checks (engine, provider with model count, workspace). It closes as soon as the server responds, and you can skip it with a click, Enter or Esc, or turn it off with `sbcCode.showSplash`.
+- **Provider switch and model picker** with a live connection indicator (green online, amber connecting, red offline).
+- **Rich replies:** headings, lists, inline code, and code blocks with a copy button. Model output is always rendered as text, never as HTML.
+- **Agent activity timeline** shows every tool call as it runs, finishes, fails or is declined.
+- **Clickable file receipts** open the files the Agent created or modified.
+- **Composer** with Agent and Selection toggles, up to three attached files, `@file(path)` mentions, Enter to send, and Stop to cancel.
+
+### Agent tools
+
+| Tool | What it does |
 | --- | --- |
-| `list_files` | Find project file paths |
-| `search_workspace` | Search text in workspace files |
-| `read_file` | Read a file or a specified line range |
-| `get_diagnostics` | Inspect VS Code Problems |
-| `propose_patch` | Apply exact, non-overlapping source replacements |
-| `propose_edits` | Create files or replace a complete, previously read file |
-| `run_checks` | Run an allowlisted check after user confirmation |
+| `list_files` | Find files in the workspace (secrets and build output are excluded) |
+| `search_workspace` | Literal text search with matching line snippets |
+| `read_file` | Read a whole file, or a 1-based line window of a large one |
+| `get_diagnostics` | Read current VS Code Problems (TypeScript, ESLint, …) |
+| `propose_patch` | Exact, unique, non-overlapping find/replace edits in files already read |
+| `propose_edits` | Create new files, or replace a file that was fully read |
+| `run_checks` | Run an allowlisted test/lint/build command, **only after you confirm** |
 
-The Agent is deliberately bounded: **up to five model rounds and ten tool executions per request**. A file-edit proposal supports **up to four files**, and exact patching supports **up to eight snippets per file**. Source-file reads are limited to **512 KiB per file**, with **18,000 characters** and **250 lines** per requested window. Large tasks may need to be split across prompts.
+The Agent is bounded so it stays predictable. It takes up to **`sbcCode.agentMaxSteps` model steps** (default 8, max 25) with three tool calls per step. Each edit covers up to four files and eight patches per file. File reads are capped at 512 KiB per file and 18,000 characters per window. If a small model emits code instead of tool calls, an explicit single-file request (such as *"create index.html"*) is still saved through the same guarded write path.
 
-When a model does not produce valid tool calls, SBC Code has a limited fallback for certain **explicit single-file creation** requests, including a complete HTML file. It does not guarantee full multi-file project generation from a small model.
+### Editor commands
 
-### Undo and recovery
+| Command | Where |
+| --- | --- |
+| **SBC Code: Explain Selection** | Editor context menu |
+| **SBC Code: Edit Selection** | Editor context menu (saved automatically or reviewed, per edit policy) |
+| **SBC Code: Fix Current File Diagnostics** | Editor context menu, sidebar ✨ button |
+| **SBC Code: Restore Last AI Edit** | Sidebar ↩ button, Command Palette |
+| **SBC Code: Select Model / Refresh Models** | Sidebar, Command Palette |
+| **SBC Code: Set API Key** | Sidebar 🔑 button, Command Palette |
+| **SBC Code: Check for Updates** | Sidebar title bar, Command Palette |
 
-Use **Undo edit** in the sidebar or **SBC Code: Restore Last AI Edit** in the Command Palette. The extension previews the proposed restoration and asks for confirmation. It refuses to restore over later modifications that do not match the recorded AI result.
+### Inline suggestions (optional)
 
-Checkpoints exist only for the current VS Code extension session, retaining up to **five recent edit batches** subject to a size budget. They are not durable backups; use Git for reliable project history.
+Enable `sbcCode.inlineSuggestions` for ghost-text completions. Requests wait for a short typing pause (≈280 ms), and a newer keystroke cancels the request in flight. Recent results are cached, so moving the cursor back and forth costs nothing. It is off by default because CPU-only inference can be slow.
 
-## Context and diagnostics
+### Edit policy and recovery
 
-You can attach context without indexing or uploading your entire repository automatically:
+| `sbcCode.agentEditMode` | Behaviour |
+| --- | --- |
+| `automatic` *(default)* | Edits are applied, saved and read back from disk to verify them |
+| `review` | Each edit opens a VS Code diff and waits for **Approve File** |
 
-- **Attach selection:** send the code currently selected in the editor.
-- **+ File:** attach up to **three** source files.
-- **`@file(src/path.ts)`:** explicitly reference a file in a request.
-- **Fix problems:** send the current editor's existing VS Code diagnostics to the Agent for investigation.
+Neither mode runs terminal commands silently. Every AI edit is checkpointed for the session (the last five batches). **Restore Last AI Edit** previews the restore and refuses to overwrite changes you made later. Checkpoints are not backups; use Git.
 
-Attachments are limited to **8,000 characters per file** and **16,000 characters combined**. Attached file content is provided for that request rather than automatically included in every later turn. Agent tools can inspect other permitted files when needed in Agent mode.
+## 🔄 Automatic updates
 
-Diagnostic results are capped and sourced from VS Code; merely reading Problems does **not** run TypeScript, ESLint, or another compiler. The Agent may request an approved check separately.
+SBC Code updates itself from **official GitHub Releases**:
 
-## Updates and releases
+```mermaid
+flowchart LR
+  A[Startup · every 6 h · window focus] --> B{New stable release?}
+  B -- no --> Z[Nothing to do]
+  B -- yes --> C[Download official VSIX]
+  C --> D{SHA-256 + size match<br/>GitHub's asset digest?}
+  D -- no --> E[Abort · warn · keep current version]
+  D -- yes --> F[Install via VS Code]
+  F --> G[Banner + 'Reload Now']
+  G --> H[After reload: 'Updated to vX' + release notes]
+```
 
-SBC Code is distributed through [GitHub Releases](https://github.com/sbc-apps/sbc-code/releases), not through a claimed Marketplace listing.
+- **Silent and verified.** Background updates show only a small status-bar indicator. The VSIX must be the exact official asset (`sbc-code-X.Y.Z.vsix` on `github.com/sbc-apps/sbc-code`), and its size and SHA-256 must match GitHub's published digest, or nothing is installed.
+- **Efficient.** Lookups use ETags, so an unchanged release returns `304 Not Modified` and does not count against GitHub's rate limit. Checks are shared across all your VS Code windows (at most hourly at startup), and the release is installed once, not once per window.
+- **Resilient.** If the computer slept, the next window focus triggers a check. Offline checks fail silently. A failed background install offers **Retry**.
+- **Tidy.** Older downloaded VSIX files are deleted after an update.
+- **Stable only.** Drafts and pre-releases are ignored, and versions never go backwards.
 
-- The extension checks for newer **stable** GitHub Releases shortly after startup and then approximately every **six hours**.
-- A notification offers **Install Update**, **View Release**, or **Later**.
-- **Install Update** downloads the official versioned VSIX, verifies its SHA-256 digest and expected size, and invokes VS Code's extension installer.
-- Installing an update requires your action. VS Code may need a window reload to activate it.
-- Run **SBC Code: Check for Updates** whenever you want to check manually.
+Choose the behaviour with `sbcCode.autoUpdate`:
 
-Automatic notifications can be disabled with `sbcCode.updateNotifications`; manual checks continue to work. An internet connection is required to check GitHub Releases, even when inference is fully local.
+| Value | Behaviour |
+| --- | --- |
+| `install` *(default)* | Download, verify and install automatically, then offer to reload |
+| `notify` | Only show a notification with **Install Update / View Release / Later** |
+| `off` | Never check automatically. **SBC Code: Check for Updates** still works |
 
-For each new package version, successful CI on the trusted `main` branch triggers the release workflow to build and publish a VSIX with a checksum file on SBC's self-hosted GitHub Actions runners.
+Update checks contact `api.github.com` and GitHub's download CDN. No source code, prompts or telemetry are sent.
 
-## Configuration
+## ⚙️ Configuration
 
-Configure SBC Code through **Settings → Extensions → SBC Code** or your VS Code settings JSON.
+Open **Settings → Extensions → SBC Code**, or click the ⚙ button in the sidebar.
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `sbcCode.provider` | `colibri` | Default provider; sidebar selection is also stored in extension state |
-| `sbcCode.baseUrl` | `http://127.0.0.1:8000/v1` | Colibri / OpenAI-compatible API base |
+| `sbcCode.provider` | `colibri` | Default provider; the sidebar switch remembers your choice |
 | `sbcCode.ollamaBaseUrl` | `http://127.0.0.1:11434` | Ollama server origin |
-| `sbcCode.model` | empty | Optional fixed Colibri model ID |
-| `sbcCode.ollamaModel` | empty | Optional fixed Ollama model name |
-| `sbcCode.agentEditMode` | `automatic` | `automatic` or `review` for file edits |
-| `sbcCode.maxTokens` | `2048` | Maximum model output tokens per request |
-| `sbcCode.temperature` | `0.2` | Model sampling temperature |
-| `sbcCode.maxContextChars` | `12000` | Maximum characters from an editor selection |
-| `sbcCode.inlineSuggestions` | `false` | Experimental inline code suggestions |
-| `sbcCode.updateNotifications` | `true` | Periodic GitHub Release notifications |
-| `sbcCode.allowInsecureRemote` | `false` | Explicitly allow non-local HTTP; not recommended |
+| `sbcCode.ollamaModel` | *empty* | Fixed Ollama model (otherwise use the sidebar picker) |
+| `sbcCode.baseUrl` | `http://127.0.0.1:8000/v1` | Colibri / OpenAI-compatible API base |
+| `sbcCode.model` | *empty* | Fixed Colibri model ID |
+| `sbcCode.agentEditMode` | `automatic` | `automatic` or `review` |
+| `sbcCode.agentMaxSteps` | `8` | Model steps per Agent request (1–25); lower is faster on CPUs |
+| `sbcCode.maxTokens` | `2048` | Maximum output tokens per request |
+| `sbcCode.temperature` | `0.2` | Sampling temperature |
+| `sbcCode.maxContextChars` | `12000` | Maximum characters of an attached editor selection |
+| `sbcCode.inlineSuggestions` | `false` | Experimental ghost-text completions |
+| `sbcCode.autoUpdate` | `install` | `install`, `notify` or `off` |
+| `sbcCode.showSplash` | `true` | Animated splash while the sidebar connects |
+| `sbcCode.allowInsecureRemote` | `false` | Allow plain HTTP to non-local servers (not recommended) |
+| `sbcCode.updateNotifications` | `true` | *Deprecated*: `false` still disables checks when `autoUpdate` is unset |
 
-Example Ollama configuration:
+<details>
+<summary>Example: fully local Ollama setup</summary>
 
 ```json
 {
   "sbcCode.provider": "ollama",
   "sbcCode.ollamaBaseUrl": "http://127.0.0.1:11434",
+  "sbcCode.ollamaModel": "qwen3-coder:latest",
   "sbcCode.agentEditMode": "automatic",
-  "sbcCode.inlineSuggestions": false
+  "sbcCode.agentMaxSteps": 8,
+  "sbcCode.autoUpdate": "install"
 }
 ```
 
-The sidebar remembers the active provider independently of User Settings. If you upgrade from a very old VSIX and settings appear unregistered, install the latest release and run **Developer: Reload Window**.
+</details>
 
-## Privacy and security
+## 🔐 Privacy and security
 
-SBC Code is **local-first, not automatically isolated from every network**.
+- **You choose where inference runs.** Localhost is the default. With a remote endpoint, the prompts and the file content the Agent reads are sent to that endpoint, and unencrypted remote HTTP is refused unless you allow it.
+- **Workspace boundary.** Tools work only inside one trusted local folder. They reject secret files (`.env*`, keys, certificates), paths outside the workspace, and symlinks that escape it.
+- **Constrained execution.** Only allowlisted check commands are available, and each one asks you first. Remember that approved project scripts run real code.
+- **Hardened webview.** It uses a strict Content Security Policy (nonce-only scripts, no inline styles or remote resources), and model output is never parsed as HTML.
+- **Secrets.** API keys live in VS Code SecretStorage and are never forwarded to Ollama.
+- **No telemetry.** The only network traffic besides your model server is the GitHub update check.
 
-- **Inference location is configurable.** If you select a remote model endpoint, prompts and source snippets used by Agent tools may be transmitted to that endpoint. Localhost defaults keep model requests on your own machine.
-- **Explicit workspace trust.** File-editing tools require one trusted local workspace and reject known secret paths and files resolving outside the workspace, including symlink escapes.
-- **Constrained execution.** Only an allowlist of project checks is available, and every check requires confirmation. Project scripts can still execute arbitrary code once you approve them.
-- **No unprompted repository upload.** Chat uses explicit attachments; Agent-mode tools can search/read permitted project files to satisfy the request.
-- **Credential handling.** An optional Colibri-compatible server key is stored in VS Code SecretStorage, and is not forwarded to Ollama.
-- **Update verification.** The updater checks official release metadata, the VSIX file size, and SHA-256 before installing.
-- **No built-in analytics or telemetry are included** in the extension's current implementation. GitHub update checks still contact GitHub.
+Always review and test AI-generated changes before shipping them.
 
-Automatic file editing can modify your source code, so use version control, inspect results, and test changes before deploying. Never treat model-generated code as automatically secure or correct.
+## 🩺 Troubleshooting
 
-## Troubleshooting
-
-| Problem | What to check |
+| Symptom | Fix |
 | --- | --- |
-| **No files created or modified** | Confirm Agent mode, a trusted local folder, and a model that can use tools or generate a supported single-file fallback |
-| **Ollama is unavailable** | Check `ollama list`, whether the server is running, and `sbcCode.ollamaBaseUrl` |
-| **No models in the picker** | Pull or start a model, then select **Refresh Models** |
-| **Provider setting not registered** | Install the current VSIX and run **Developer: Reload Window** |
-| **Agent does not complete a large task** | Split work into smaller requests; tool rounds, file counts, and context windows are bounded |
-| **Inline suggestions are missing** | Enable `sbcCode.inlineSuggestions` and ensure a model is selected; CPU inference can be slow |
-| **Update notification is missing** | Check `sbcCode.updateNotifications`, internet access, and **SBC Code: Check for Updates** |
-| **An edit cannot be restored** | In-session checkpoints may have expired, or the file changed after the AI edit; use Git to recover earlier versions |
+| Red dot / *Server offline* | Start Ollama or Colibri, check the URL setting, then press ↻ |
+| No models in the picker | `ollama pull <model>` (or load a model in Colibri), then ↻ |
+| *No files created or modified* | Turn **Agent** on, open a trusted folder, and use a tool-calling coding model |
+| Agent stops before finishing | Split the task, or raise `sbcCode.agentMaxSteps` |
+| No inline suggestions | Enable `sbcCode.inlineSuggestions` and select a model; CPU models are slow |
+| Update not installing | Run **SBC Code: Check for Updates**, check `sbcCode.autoUpdate` and internet access |
+| Splash feels unnecessary | Set `sbcCode.showSplash` to `false` |
+| A restore is refused | The file changed after the AI edit; recover with Git |
 
-For a reproducible problem, please open an [issue](https://github.com/sbc-apps/sbc-code/issues) with the installed extension version, provider, model name, reproduction steps, and relevant sanitized logs. **Do not paste API keys or private project source into public issues.**
+Please report bugs in [Issues](https://github.com/sbc-apps/sbc-code/issues) with your extension version, provider, model and steps to reproduce. **Never paste API keys or private source into public issues.**
 
-## Development
+## 🧑‍💻 Development
 
-### Prerequisites
-
-- **Visual Studio Code 1.90+**
-- **Node.js 20+** for the current build tooling
-- A running model server only for manual inference tests
+**Requirements:** Node.js 20+, VS Code 1.90+.
 
 ```bash
 git clone https://github.com/sbc-apps/sbc-code.git
 cd sbc-code
-
-npm install
-npm run check
-npm test
-npm run package
+npm ci             # dependencies are pinned in package-lock.json
+npm run check      # type-check the extension host and the webview
+npm test           # build + 60+ unit and HTTP integration tests
+npm run package    # produce sbc-code-X.Y.Z.vsix
 ```
 
-Use **F5** in VS Code to launch the Extension Development Host. The `npm run package` command produces an installable `.vsix` file.
+Press **F5** to start an Extension Development Host. While working on the sidebar, run `npm run watch:webview` for incremental bundles with source maps.
 
-For a manually started Colibri server, a lightweight transport smoke test is available:
+### Architecture
+
+```mermaid
+flowchart TB
+  subgraph Host["Extension host (Node, src/*.ts → out/)"]
+    EXT[extension.ts] --> CHAT[chatView.ts]
+    EXT --> UPD[releaseUpdates.ts]
+    EXT --> INL[inlineCompletion.ts]
+    CHAT --> AG[agentRunner.ts] --> TOOLS[agentTools.ts]
+    TOOLS --> CK[editCheckpoints.ts]
+    CHAT & AG & INL --> CLIENT[colibriClient.ts]
+  end
+  subgraph Web["Sidebar webview (React, src/webview → media/webview.js)"]
+    APP[App.tsx] --> SPL[Splash.tsx]
+    APP --> MSG[MessageView.tsx] --> MD[messageMarkdown.ts]
+    APP --> ICONS[Animate UI icons]
+  end
+  CHAT <-- postMessage --> APP
+  CLIENT -- HTTP --> M[(Ollama / Colibri)]
+  UPD -- HTTPS --> GH[(GitHub Releases)]
+```
+
+| Path | Purpose |
+| --- | --- |
+| `src/extension.ts` | Activation, commands, wiring |
+| `src/chatView.ts` | Webview host, chat/agent orchestration, batched streaming |
+| `src/agentRunner.ts`, `src/agentTools.ts` | Agent loop and guarded workspace tools |
+| `src/colibriClient.ts`, `src/modelProviders.ts` | OpenAI-compatible and Ollama transport |
+| `src/releaseUpdates.ts`, `src/updatePolicy.ts`, `src/releaseMetadata.ts` | Verified automatic updates |
+| `src/webview/` | React UI, splash and vendored Animate UI icons (bundled by esbuild) |
+| `src/messageMarkdown.ts` | Safe Markdown subset shared by the UI and its tests |
+| `scripts/build-webview.mjs` | esbuild bundle → `media/webview.js` |
+| `scripts/publish-release.mjs` | CI release publisher (VSIX + SHA-256) |
+
+### Smoke test against a real Colibri server
 
 ```bash
 COLIBRI_BASE_URL=http://127.0.0.1:8000/v1 npm run smoke:colibri
 npm run smoke:colibri -- --tools
 ```
 
-Set `COLIBRI_MODEL` to target a particular installed model. The smoke test uses a fixed prompt and does not read workspace files.
+### Releasing
 
-### Continuous integration and releases
+1. Bump `version` in `package.json` and add a `CHANGELOG.md` entry.
+2. Merge to `main`. [CI](.github/workflows/ci.yml) type-checks, tests and packages on SBC self-hosted runners (fork PRs never run there).
+3. The [Release workflow](.github/workflows/release.yml) publishes `vX.Y.Z` with `sbc-code-X.Y.Z.vsix`, its `.sha256`, and a `sbc-code.vsix` copy behind the permanent *latest* download link. Existing releases are never overwritten, and stale commits are skipped.
+4. Installed copies pick up the release automatically.
 
-The [CI workflow](https://github.com/sbc-apps/sbc-code/actions/workflows/ci.yml) runs TypeScript checks, Node tests, script checks, and VSIX packaging on SBC self-hosted runners. Pull requests from forks do not run untrusted code on those runners. A successful trusted `main` CI run can trigger the [Release workflow](https://github.com/sbc-apps/sbc-code/actions/workflows/release.yml) for a new version.
+## 📜 License and credits
 
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+The package manifest is marked `UNLICENSED`. Public source visibility does not by itself grant a reuse or redistribution license.
 
-## Project scope
-
-SBC Code is being developed as a capable, self-hosted-model coding assistant. Features such as durable conversation persistence, advanced repository indexing, multi-root/remote workspaces, arbitrary shell automation, automatic Git commits, and production-grade parity with commercial agent products are **not yet available**.
-
-The repository's current package manifest is marked `UNLICENSED`. Public source visibility does not, by itself, grant a general reuse or redistribution license.
+The sidebar bundles [Animate UI](https://animate-ui.com) (MIT + Commons Clause), [Motion](https://motion.dev) and [React](https://react.dev) (MIT), and Lucide-derived icon artwork (ISC). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ---
 
 <div align="center">
 
-**SBC Code — Built for developers who want direct control over where their AI runs.**
+**SBC Code: built for developers who want control over where their AI runs.**
 
 Designed & built by **[SBC](https://sbc.om/)**
 

@@ -40,19 +40,22 @@ export class AgentRunner {
     signal: AbortSignal,
     onActivity: (activity: AgentActivity) => void,
     onWriteReport?: (report: AgentWriteReport) => void,
+    maxSteps = 8,
   ): Promise<AgentRunResult> {
     this.tools.resetTurn();
+    // Each step may call several tools; cap total tool calls to keep runs bounded.
+    const toolBudget = maxSteps * 3;
     let report = initialWriteReport();
     const messages: AgentToolMessage[] = [
       { role: 'system', content: AGENT_PROMPT },
       ...userMessages.filter((item) => item.role === 'user' || item.role === 'assistant'),
     ];
     let count = 0;
-    for (let round = 0; round < 5; round++) {
+    for (let round = 0; round < maxSteps; round++) {
       if (signal.aborted) {
         throw new Error('Agent cancelled.');
       }
-      onActivity({ state: 'thinking', step: 'Thinking (' + (round + 1) + '/5)' });
+      onActivity({ state: 'thinking', step: 'Thinking (' + (round + 1) + '/' + maxSteps + ')' });
       let reply;
       try {
         reply = await this.api.agentStep(model, messages, AGENT_TOOLS, { maxTokens, temperature, signal });
@@ -87,7 +90,7 @@ export class AgentRunner {
         const toolName = call.function.name;
         onActivity({ state: 'started', step: toolName, id: call.id });
         let output: string;
-        if (count >= 10) {
+        if (count >= toolBudget) {
           output = JSON.stringify({ error: 'Tool budget reached. Summarize progress without further tool use.' });
         } else {
           output = await this.tools.execute(call, signal);
@@ -100,7 +103,7 @@ export class AgentRunner {
       }
     }
     return {
-      text: 'The agent reached its five-step limit. Review the created/modified file list and continue with a smaller request.',
+      text: 'The agent reached its ' + maxSteps + '-step limit. Review the created/modified files and continue, or raise sbcCode.agentMaxSteps.',
       files: report,
     };
   }

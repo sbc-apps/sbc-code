@@ -118,6 +118,9 @@ async function upload(name, bytes, mime) {
 
 await upload(filename,archive,'application/octet-stream');
 await upload(checksumName,Buffer.from(checksum + '  ' + filename + '\n'),'text/plain');
+// Stable name for https://github.com/<repo>/releases/latest/download/sbc-code.vsix install links.
+// The in-extension updater still only accepts the versioned asset and its digest.
+await upload('sbc-code.vsix',archive,'application/octet-stream');
 
 const published = await api('/releases/' + release.id,{
   method:'PATCH',

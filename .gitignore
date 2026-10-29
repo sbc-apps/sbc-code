@@ -6,3 +6,4 @@ out/
 !.env.example
 .DS_Store
 coverage/
+media/webview.js

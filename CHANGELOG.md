@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.0.0 — animated sidebar, splash screen and automatic updates
+
+### Interface
+- Rebuild the sidebar in React with [Animate UI](https://animate-ui.com) and Motion: animated icons, sliding provider switch, live connection indicator, theme-aware styling and reduced-motion support.
+- Add an animated splash screen with live startup checks (engine, provider/model count, workspace). It closes as soon as the server responds, at most 2.8 s; skip with click/Enter/Esc or disable with `sbcCode.showSplash`.
+- Render replies as safe Markdown (headings, lists, inline code, code blocks with copy) without ever interpreting model output as HTML.
+- Show an Agent activity timeline, clickable Created/Modified file receipts, an update banner and starter suggestions.
+
+### Automatic updates
+- New `sbcCode.autoUpdate` setting: `install` (default) downloads, verifies (SHA-256 + size) and installs new stable releases in the background, then offers to reload; `notify` and `off` are also available.
+- Activate on startup so checks run without opening the sidebar; re-check on window focus after sleep.
+- Use ETag conditional requests (304 responses do not consume GitHub API rate limit) and coordinate checks/installs across VS Code windows.
+- Announce the new version after reload and remove stale downloaded VSIX files.
+- `sbcCode.updateNotifications` is deprecated; `false` still disables checks when `autoUpdate` is unset.
+
+### Performance
+- Coalesce streamed tokens (~40 webview updates/s instead of one per token).
+- Inline suggestions: typing-pause debounce, cancellation of superseded requests, LRU result cache, no full-document reads per keystroke.
+- Configurable Agent budget with `sbcCode.agentMaxSteps` (default 8, previously fixed at 5 steps / 10 tools).
+- Fix the `maxTokens` fallback to match the documented 2048 default.
+
+### Engineering
+- Publish a version-less `sbc-code.vsix` with every release so https://github.com/sbc-apps/sbc-code/releases/latest/download/sbc-code.vsix always installs the newest version.
+- Bundle the webview with esbuild; commit `package-lock.json` and use `npm ci` in CI and releases.
+- Add tests for update policy, completion cache and Markdown rendering (61 tests).
+- Add THIRD_PARTY_NOTICES.md.
+
+
 ## 0.9.0 — autonomous, verified on-disk source editing
 
 - Automatically apply and save workspace file edits in trusted local projects by default; no repeated Approve File prompts.

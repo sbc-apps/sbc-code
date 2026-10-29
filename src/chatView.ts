@@ -12,6 +12,7 @@ import { ModelProvider } from './modelProviders';
 import { PROVIDER_STATE_KEY, selectProvider } from './providerSelection';
 import { resolveWorkspaceFile } from './workspacePaths';
 import { promises as fs } from 'node:fs';
+import { ReleaseUpdates } from './releaseUpdates';
 
 const SYSTEM_PROMPT = [
   'You are SBC Code, a local-first programming assistant.',
@@ -21,6 +22,8 @@ const SYSTEM_PROMPT = [
 ].join('\n');
 const MAX_PROMPT_CHARS = 12000;
 const MAX_HISTORY_CHARS = 12000;
+/** Coalesce streamed tokens so fast models do not flood the webview with tiny messages. */
+const DELTA_FLUSH_MS = 24;
 
 function readableError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -36,12 +39,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private history: ChatMessage[] = [];
   private currentRequest?: AbortController;
   private readonly fileAttachments = new FileAttachments();
+  private pendingDelta = '';
+  private deltaTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly client: ColibriClient,
     private readonly agent: AgentRunner,
+    private readonly updates: ReleaseUpdates,
   ) {
+    context.subscriptions.push(updates.onDidChangeState((state) => this.post({ type: 'update', ...state })));
     this.activeProvider = readSettings().provider;
     this.selectedModels = {
       colibri: context.globalState.get<string>('sbcCode.selectedModel.colibri',
@@ -80,11 +87,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.currentRequest?.abort();
       this.view = undefined;
     });
+    void this.refreshModels();
+  }
+
+  private postInitialState(): void {
+    const config = vscode.workspace.getConfiguration('sbcCode');
+    this.post({
+      type: 'init',
+      version: this.updates.version,
+      showSplash: config.get<boolean>('showSplash', true),
+    });
     this.post({ type: 'models', models: this.models, selected: this.getModel(), provider: readSettings().provider });
     this.post({ type: 'attachments', files: this.fileAttachments.list() });
     this.post({ type: 'workspace', ...this.workspaceStatus() });
-    this.post({ type: 'editPolicy', mode: vscode.workspace.getConfiguration('sbcCode').get<string>('agentEditMode', 'automatic') });
-    void this.refreshModels();
+    this.post({ type: 'editPolicy', mode: config.get<string>('agentEditMode', 'automatic') });
+    this.post({ type: 'update', ...this.updates.state });
   }
 
   getModel(): string {
@@ -109,6 +126,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   async refreshModels(): Promise<void> {
     const provider = readSettings().provider;
     this.post({ type: 'status', message: 'Connecting to ' + (provider === 'ollama' ? 'Ollama' : 'Colibri') + '…' });
+    this.post({ type: 'connection', state: 'connecting', provider });
     try {
       const available = await this.client.models();
       if (readSettings().provider !== provider) {
@@ -120,11 +138,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       this.post({ type: 'models', models: available, selected: this.getModel(), provider });
       this.post({ type: 'status', message: available.length + ' ' + provider + ' model(s) available' });
+      this.post({ type: 'connection', state: 'online', provider, count: available.length });
     } catch (error) {
       if (readSettings().provider !== provider) {
         return;
       }
       this.post({ type: 'status', message: provider + ' server offline or unavailable' });
+      this.post({ type: 'connection', state: 'offline', provider });
       this.post({ type: 'error', message: readableError(error) });
     }
   }
@@ -197,10 +217,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const input = message as Record<string, unknown>;
     switch (input.type) {
       case 'ready':
-        this.post({ type: 'models', models: this.models, selected: this.getModel(), provider: readSettings().provider });
-        this.post({ type: 'workspace', ...this.workspaceStatus() });
-        this.post({ type: 'editPolicy', mode: vscode.workspace.getConfiguration('sbcCode').get<string>('agentEditMode', 'automatic') });
+        this.postInitialState();
         break;
+      case 'openSettings':
+        await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:sbc-apps.sbc-code');
+        break;
+      case 'checkUpdates':
+        await this.updates.check(true);
+        break;
+      case 'reloadWindow':
+        await vscode.commands.executeCommand('workbench.action.reloadWindow');
+        break;
+      case 'openReleaseNotes': {
+        const state = this.updates.state;
+        if ('releaseUrl' in state) {
+          await vscode.env.openExternal(vscode.Uri.parse(state.releaseUrl));
+        }
+        break;
+      }
       case 'send':
         if (typeof input.prompt === 'string') {
           await this.sendPrompt(input.prompt, input.attachSelection === true, input.agentMode === true);
@@ -389,6 +423,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             type: 'writeReport', mode: 'Agent', created: report.created,
             modified: report.modified, attempted: report.writeToolsAttempted,
           }),
+          settings.agentMaxSteps,
         );
         answer = execution.text;
         this.post({
@@ -407,7 +442,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           model,
           messages,
           { maxTokens: settings.maxTokens, temperature: settings.temperature, signal: controller.signal },
-          (chunk) => this.post({ type: 'delta', text: chunk }),
+          (chunk) => this.queueDelta(chunk),
         );
       }
       if (!answer.trim()) {
@@ -433,51 +468,48 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private queueDelta(text: string): void {
+    this.pendingDelta += text;
+    this.deltaTimer ??= setTimeout(() => this.flushDelta(), DELTA_FLUSH_MS);
+  }
+
+  private flushDelta(): void {
+    if (this.deltaTimer) {
+      clearTimeout(this.deltaTimer);
+      this.deltaTimer = undefined;
+    }
+    if (this.pendingDelta) {
+      const text = this.pendingDelta;
+      this.pendingDelta = '';
+      void this.view?.webview.postMessage({ type: 'delta', text });
+    }
+  }
+
+  /** Every non-delta message flushes buffered tokens first, preserving order. */
   private post(message: Record<string, unknown>): void {
+    this.flushDelta();
     void this.view?.webview.postMessage(message);
   }
 
   private html(webview: vscode.Webview): string {
     const nonce = randomBytes(16).toString('hex');
-    const script = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'chat.js'));
-    const styles = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'chat.css'));
+    const media = (name: string) => webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', name));
+    const csp = [
+      "default-src 'none'",
+      'img-src ' + webview.cspSource + ' data:',
+      'font-src ' + webview.cspSource,
+      'style-src ' + webview.cspSource,
+      "script-src 'nonce-" + nonce + "'",
+    ].join('; ');
     return [
       '<!DOCTYPE html><html lang="en"><head>',
       '<meta charset="UTF-8">',
       '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-      '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src ' + webview.cspSource +
-        '; script-src &#39;nonce-' + nonce + '&#39;;">',
-      '<link rel="stylesheet" href="' + styles + '">',
+      '<meta http-equiv="Content-Security-Policy" content="' + csp + '">',
+      '<link rel="stylesheet" href="' + media('webview.css') + '">',
       '<title>SBC Code</title></head><body>',
-      '<main class="layout">',
-      '<header class="heading"><div><strong>SBC Code</strong><span>Local AI Coding Agent</span></div>',
-      '<div class="header-actions"><button id="fix-diagnostics" type="button" title="Fix current file problems with Agent">Fix problems</button>',
-      '<button id="restore" type="button" title="Review and restore last AI edit">Undo edit</button>',
-      '<button id="clear" type="button" title="Clear conversation">Clear</button>',
-      '<button id="key" type="button" title="Set API key">Key</button></div></header>',
-      '<div class="models"><label for="provider">Provider</label><select id="provider" aria-label="Select AI provider">',
-      '<option value="colibri">Colibri / Compatible</option><option value="ollama">Ollama (Local)</option></select></div>',
-      '<div class="models"><label for="model">Model</label><select id="model" aria-label="Select model"><option value="">Select a model</option></select>',
-      '<button id="refresh" type="button" title="Refresh models" aria-label="Refresh models">↻</button></div>',
-      '<div id="status" role="status">Connecting…</div>',
-      '<div id="workspace" class="workspace-status" aria-live="polite"></div>',
-      '<div id="error" role="alert" hidden></div>',
-      '<section id="messages" aria-label="Conversation" aria-live="polite">',
-      '<div class="empty">Ask about code, or enable Agent to inspect your workspace, propose edits, and run approved checks.</div>',
-      '</section>',
-      '<form id="composer"><div class="mode-controls">',
-      '<label class="mode"><input id="agent" type="checkbox" checked> Agent mode (file changes need approval)</label>',
-      '<label class="context"><input id="attach" type="checkbox"> Attach selection</label>',
-      '<button id="attach-files" class="attach-files" type="button" title="Attach up to 3 local code files">+ File</button>',
-      '</div>',
-      '<div id="attachments" class="attachments" aria-live="polite" hidden></div>',
-      '<div id="edit-policy" class="edit-policy" role="status">Automatic workspace edits enabled</div>',
-      '<div id="write-report" class="write-report" role="status">No files have been changed in this conversation.</div>',
-      '<textarea id="prompt" rows="3" maxlength="12000" aria-label="Message" placeholder="Ask SBC Code to build, explain or fix…"></textarea>',
-      '<div class="composer-actions"><span class="hint">Enter to send · Shift+Enter for newline</span>',
-      '<button id="stop" type="button" hidden>Stop</button><button id="send" type="submit">Send</button></div>',
-      '</form></main>',
-      '<script nonce="' + nonce + '" src="' + script + '"></script>',
+      '<div id="root" data-logo="' + media('sbc-logo.png') + '"></div>',
+      '<script nonce="' + nonce + '" src="' + media('webview.js') + '"></script>',
       '</body></html>',
     ].join('');
   }

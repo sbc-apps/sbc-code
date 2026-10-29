@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install development dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Type-check
         run: npm run check
       - name: Unit tests

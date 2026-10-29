@@ -9,3 +9,6 @@ tsconfig.json
 .gitignore
 *.vsix
 scripts/**
+node_modules/**
+docs/**
+.npmrc

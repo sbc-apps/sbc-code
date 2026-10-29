@@ -44,7 +44,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const checkpoints = new EditCheckpoints(context);
   const agentTools = new AgentTools(context, checkpoints);
   const agent = new AgentRunner(client, agentTools);
-  const chat = new ChatViewProvider(context, client, agent);
+  const chat = new ChatViewProvider(context, client, agent, releaseUpdates);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chat, {
       webviewOptions: { retainContextWhenHidden: true },

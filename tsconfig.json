@@ -2,7 +2,10 @@
   "compilerOptions": {
     "module": "commonjs",
     "target": "ES2022",
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
@@ -10,8 +13,17 @@
     "skipLibCheck": true,
     "rootDir": "src",
     "outDir": "out",
-    "types": ["node", "vscode"]
+    "types": [
+      "node",
+      "vscode"
+    ]
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "out"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "out",
+    "src/webview"
+  ]
 }

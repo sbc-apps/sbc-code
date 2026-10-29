@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify source and release scripts
         run: |
           npm run check

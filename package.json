@@ -1,8 +1,8 @@
 {
   "name": "sbc-code",
   "displayName": "SBC Code",
-  "description": "Local-first autonomous VS Code coding agent with Ollama, Colibri, verified on-disk edits, checkpoints and optional code review.",
-  "version": "0.9.0",
+  "description": "Local-first autonomous AI coding agent for VS Code: Ollama and Colibri models, verified on-disk edits, checkpoints, animated sidebar and verified automatic updates.",
+  "version": "1.0.0",
   "publisher": "sbc-apps",
   "license": "UNLICENSED",
   "private": true,
@@ -17,12 +17,16 @@
   "keywords": [
     "SBC",
     "Colibri",
+    "Ollama",
     "local AI",
+    "AI agent",
     "coding assistant",
-    "offline"
+    "offline",
+    "privacy"
   ],
   "main": "./out/extension.js",
   "activationEvents": [
+    "onStartupFinished",
     "onView:sbcCode.chatView",
     "onCommand:sbcCode.openChat",
     "onCommand:sbcCode.editSelection",
@@ -188,7 +192,23 @@
         "sbcCode.updateNotifications": {
           "type": "boolean",
           "default": true,
-          "description": "Check official SBC Code GitHub Releases when VS Code starts and every six hours, and notify when a newer stable version is available. No source code is sent."
+          "description": "Legacy switch. Prefer sbcCode.autoUpdate.",
+          "deprecationMessage": "Use sbcCode.autoUpdate instead. Setting this to false still disables update checks when sbcCode.autoUpdate is not set."
+        },
+        "sbcCode.autoUpdate": {
+          "type": "string",
+          "default": "install",
+          "enum": [
+            "install",
+            "notify",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Download, verify (SHA-256 and size) and install new stable releases automatically, then offer to reload",
+            "Only notify when a new stable release is available",
+            "Never check for updates automatically"
+          ],
+          "description": "How SBC Code keeps itself up to date from official GitHub Releases. Checks run at startup (at most hourly across windows), every six hours and when the window regains focus. No source code is sent."
         },
         "sbcCode.provider": {
           "type": "string",
@@ -225,23 +245,44 @@
             "Show diffs and ask approval before each edit"
           ],
           "description": "File edit policy for SBC Code Agent and Edit Selection. Automatic edits are restricted to a trusted local workspace. Terminal commands still require separate approval."
+        },
+        "sbcCode.agentMaxSteps": {
+          "type": "integer",
+          "default": 8,
+          "minimum": 1,
+          "maximum": 25,
+          "description": "Maximum model round-trips per Agent request. Each step may call several tools (up to three tool calls per step in total). Lower values respond faster on CPU-only machines."
+        },
+        "sbcCode.showSplash": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the animated SBC Code splash screen while the sidebar connects to the model server. It closes as soon as the server responds."
         }
       }
     }
   },
   "scripts": {
-    "compile": "tsc -p .",
-    "check": "tsc --noEmit -p .",
+    "build:webview": "node scripts/build-webview.mjs",
+    "watch:webview": "node scripts/build-webview.mjs --watch",
+    "compile": "tsc -p . && npm run build:webview",
+    "check": "tsc --noEmit -p . && tsc -p src/webview",
     "watch": "tsc -watch -p .",
-    "test": "npm run compile && node --test out/test/*.test.js && node --check media/chat.js",
+    "test": "npm run compile && node --test out/test/*.test.js && node --check media/webview.js",
     "package": "npm run compile && vsce package --no-dependencies",
     "smoke:colibri": "node scripts/colibri-smoke.mjs",
     "check:smoke": "node --check scripts/colibri-smoke.mjs"
   },
   "devDependencies": {
+    "@animate-ui/react": "^2.4.1",
     "@types/node": "^20.17.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.25.10",
+    "motion": "^14.7.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "typescript": "^5.6.3"
   },
   "icon": "media/sbc-logo.png",
