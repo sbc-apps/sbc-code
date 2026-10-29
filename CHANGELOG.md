@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 — development
+
+- Add a read-only `get_diagnostics` Agent tool for TypeScript, ESLint and other VS Code Problems within the trusted workspace.
+- Add a Fix Current File Diagnostics command, editor context action and sidebar shortcut to request reviewed Agent fixes.
+- Bound diagnostic reporting to avoid unnecessarily large local-model prompts and exclude secret/out-of-workspace paths.
+- Add HTTP integration tests using a local Colibri-compatible mock server for models, chat, streaming, tool calls and failures.
+- Keep existing diff review, approval, checkpoint and rollback protections.
+
+
 ## 0.4.0 — development
 
 - Add `propose_patch` to make exact, reviewable multi-file source edits without returning complete file contents.

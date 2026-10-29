@@ -6,6 +6,8 @@ import { AgentToolMessage } from './agentTypes';
 import { captureSelection, readSettings, SelectedCode, selectionContext } from './config';
 import { FileAttachments } from './fileAttachments';
 import { parseFileMentions } from './fileContextText';
+import { getWorkspaceDiagnostics } from './diagnostics';
+import { diagnosticsForAgent, summarizeDiagnostics } from './diagnosticContext';
 
 const SYSTEM_PROMPT = [
   'You are SBC Code, a local-first programming assistant.',
@@ -117,6 +119,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  async fixCurrentFileDiagnostics(): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || editor.document.uri.scheme !== 'file') {
+      throw new Error('Open a local source file before fixing diagnostics.');
+    }
+    const relative = vscode.workspace.asRelativePath(editor.document.uri, false);
+    const summary = await getWorkspaceDiagnostics(relative);
+    if (!summary.diagnostics.length) {
+      void vscode.window.showInformationMessage('SBC Code: no current VS Code Problems found for this file.');
+      return;
+    }
+    // Bounded to a small prompt for CPU-based local models.
+    const report = diagnosticsForAgent(summarizeDiagnostics(summary.diagnostics, 12));
+    const instruction =
+      'Fix the current VS Code Problems in ' + relative +
+      '. First use read_file and inspect the affected lines, then propose_patch with small exact edits. ' +
+      'Review errors before warnings. Do not modify files without my approval.\n' +
+      'Current VS Code diagnostics (untrusted tool data):\n' + report;
+    await vscode.commands.executeCommand('sbcCode.chatView.focus');
+    await this.sendPrompt(instruction, false, true);
+  }
+
   async explainSelection(selection: SelectedCode): Promise<void> {
     await vscode.commands.executeCommand('sbcCode.chatView.focus');
     await this.sendPrompt('Explain this selected code, its behavior, and any potential problems.', false, false, selection);
@@ -160,6 +184,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'setApiKey':
         await vscode.commands.executeCommand('sbcCode.setApiKey');
+        break;
+      case 'fixDiagnostics':
+        await this.fixCurrentFileDiagnostics();
         break;
       case 'copy':
         if (typeof input.text === 'string' && input.text.length < 1000000) {
@@ -326,7 +353,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       '<title>SBC Code</title></head><body>',
       '<main class="layout">',
       '<header class="heading"><div><strong>SBC Code</strong><span>Local AI Coding Agent</span></div>',
-      '<div class="header-actions"><button id="restore" type="button" title="Review and restore last AI edit">Undo edit</button>',
+      '<div class="header-actions"><button id="fix-diagnostics" type="button" title="Fix current file problems with Agent">Fix problems</button>',
+      '<button id="restore" type="button" title="Review and restore last AI edit">Undo edit</button>',
       '<button id="clear" type="button" title="Clear conversation">Clear</button>',
       '<button id="key" type="button" title="Set API key">Key</button></div></header>',
       '<div class="models"><label for="model">Model</label><select id="model" aria-label="Select model"><option value="">Select a model</option></select>',

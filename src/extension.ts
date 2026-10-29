@@ -58,6 +58,7 @@ export function activate(context: vscode.ExtensionContext): void {
   register('sbcCode.selectModel', () => chat.chooseModel());
   register('sbcCode.editSelection', () => edits.run());
   register('sbcCode.restoreLastEdit', () => checkpoints.restoreLast());
+  register('sbcCode.fixDiagnostics', () => chat.fixCurrentFileDiagnostics());
   register('sbcCode.explainSelection', async () => {
     const selection = captureSelection(vscode.window.activeTextEditor, readSettings().maxContextChars);
     await chat.explainSelection(selection);
