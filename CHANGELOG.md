@@ -6,6 +6,7 @@
 - Add a Fix Current File Diagnostics command, editor context action and sidebar shortcut to request reviewed Agent fixes.
 - Bound diagnostic reporting to avoid unnecessarily large local-model prompts and exclude secret/out-of-workspace paths.
 - Add HTTP integration tests using a local Colibri-compatible mock server for models, chat, streaming, tool calls and failures.
+- Add an optional real-server Colibri smoke script, including a no-execution tool protocol probe.
 - Keep existing diff review, approval, checkpoint and rollback protections.
 
 

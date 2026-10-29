@@ -182,7 +182,9 @@
     "check": "tsc --noEmit -p .",
     "watch": "tsc -watch -p .",
     "test": "npm run compile && node --test out/test/*.test.js && node --check media/chat.js",
-    "package": "npm run compile && vsce package --no-dependencies"
+    "package": "npm run compile && vsce package --no-dependencies",
+    "smoke:colibri": "node scripts/colibri-smoke.mjs",
+    "check:smoke": "node --check scripts/colibri-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",

@@ -105,7 +105,15 @@ The Agent also has a read-only `get_diagnostics` tool for Problems in the truste
 
 ## Local Colibri HTTP compatibility tests
 
-The development test suite starts a local HTTP server that imitates the documented Colibri API and checks model discovery, authorization, ordinary chat responses, fragmented SSE streaming, OpenAI tool calls and API error handling. This verifies the extension's transport contract but does **not** prove correct model output from a real Colibri installation. Real-model testing is still required before production release.
+The development test suite starts a local HTTP server that imitates the documented Colibri API and checks model discovery, authorization, ordinary chat responses, fragmented SSE streaming, OpenAI tool calls and API error handling. This verifies the extension's transport contract but does **not** prove correct model output from a real Colibri installation. Real-model testing is still required before production release. To run a manual test against a Colibri server you have installed locally, use:
+
+```bash
+COLIBRI_BASE_URL=http://127.0.0.1:8000/v1 npm run smoke:colibri
+# Optional: check tool-calling protocol (requires a compatible model)
+npm run smoke:colibri -- --tools
+```
+
+You can set `COLIBRI_MODEL` to choose a specific installed model and `COLIBRI_API_KEY` if the server requires authentication. This smoke test sends a short fixed prompt, does not read your code, and does not execute model-proposed tools. It can be slow on CPU-only large models.
 
 ## Targeted Agent patches and line-range reads
 
