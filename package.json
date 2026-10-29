@@ -1,8 +1,8 @@
 {
   "name": "sbc-code",
   "displayName": "SBC Code",
-  "description": "Local-first VS Code coding agent: Colibri, workspace diagnostics, reviewed exact patches, reversible edits and local inference.",
-  "version": "0.5.0",
+  "description": "Local-first VS Code coding agent with Colibri and verified GitHub Release updates.",
+  "version": "0.6.0",
   "publisher": "sbc-apps",
   "license": "UNLICENSED",
   "private": true,
@@ -31,7 +31,8 @@
     "onCommand:sbcCode.selectModel",
     "onCommand:sbcCode.refreshModels",
     "onCommand:sbcCode.restoreLastEdit",
-    "onCommand:sbcCode.fixDiagnostics"
+    "onCommand:sbcCode.fixDiagnostics",
+    "onCommand:sbcCode.checkForUpdates"
   ],
   "contributes": {
     "viewsContainers": {
@@ -92,6 +93,11 @@
         "command": "sbcCode.fixDiagnostics",
         "title": "SBC Code: Fix Current File Diagnostics",
         "icon": "$(wrench)"
+      },
+      {
+        "command": "sbcCode.checkForUpdates",
+        "title": "SBC Code: Check for Updates",
+        "icon": "$(cloud-download)"
       }
     ],
     "menus": {
@@ -127,6 +133,11 @@
           "command": "sbcCode.restoreLastEdit",
           "when": "view == sbcCode.chatView",
           "group": "navigation@3"
+        },
+        {
+          "command": "sbcCode.checkForUpdates",
+          "when": "view == sbcCode.chatView",
+          "group": "navigation@4"
         }
       ]
     },
@@ -173,6 +184,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable optional AI inline ghost-text suggestions. Disabled by default because Colibri models on CPU may be slow."
+        },
+        "sbcCode.updateNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check official SBC Code GitHub Releases when VS Code starts and every six hours, and notify when a newer stable version is available. No source code is sent."
         }
       }
     }

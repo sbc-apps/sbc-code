@@ -2,7 +2,7 @@
 
 **Local-first AI coding agent for VS Code**, built by SBC. It works with [Colibri](https://github.com/JustVugg/colibri) and other OpenAI-compatible chat-completions servers.
 
-> **Status:** 0.5.0 experimental development build. Includes an initial tool-using Agent mode, but is not yet at feature parity with Codex, Claude Code or GitHub Copilot.
+> **Status:** 0.6.0 experimental development build. Not yet at full feature parity with Codex, Claude Code or GitHub Copilot. Includes an initial tool-using Agent mode, but is not yet at feature parity with Codex, Claude Code or GitHub Copilot.
 
 ## Features
 
@@ -20,6 +20,18 @@
 - **Explain Selection:** right-click selected code or use the Command Palette.
 - **Edit Selection:** request replacement code, review a complete file diff, then explicitly apply the edit. No automatic file writes.
 - **Local-first security:** localhost is the default; remote endpoints require HTTPS unless you opt into insecure remote HTTP. Optional API key stored in VS Code SecretStorage rather than workspace settings.
+
+## GitHub Releases and in-editor updates
+
+SBC Code publishes stable releases at [GitHub Releases](https://github.com/sbc-apps/sbc-code/releases). When trusted main-branch CI passes, a separate release workflow builds a `.vsix`, generates a SHA-256 checksum file, and publishes a new `vX.Y.Z` release **only when the package version is new**. Release creation and packaging use SBC's self-hosted CI runners.
+
+**First installation:** If you previously installed SBC Code from a CI artifact, install version 0.6.0 once from GitHub Releases. Older versions do not contain the updater. In VS Code, open Extensions → More Actions → **Install from VSIX...** and choose `sbc-code-0.6.0.vsix`.
+
+After that, the extension checks the official public GitHub Releases API shortly after startup and every six hours. It shows a notification for each new stable version. Choose **Install Update** to download the official VSIX, verify its exact SHA-256 digest and file size from GitHub release metadata, and install through VS Code's built-in extension installer. Choose **Reload Window** to activate the new version. Updates are never installed without approval.
+
+Open the Command Palette and run **SBC Code: Check for Updates** to check at any time. Disable automatic notifications with `sbcCode.updateNotifications: false`. Manual checks remain available.
+
+**Why a custom updater?** VS Code normally disables built-in automatic extension updates for manually installed VSIX files. Installing from a GitHub Release is separate from publishing through the Visual Studio Marketplace. The custom update check sends only a request to GitHub; it does not transmit your project files, model prompts, or workspace content.
 
 ## Requirements
 
