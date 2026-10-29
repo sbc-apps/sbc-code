@@ -208,5 +208,13 @@
     "@vscode/vsce": "^3.2.0",
     "typescript": "^5.6.3"
   },
-  "icon": "media/sbc-logo.png"
+  "icon": "media/sbc-logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sbc-apps/sbc-code.git"
+  },
+  "homepage": "https://github.com/sbc-apps/sbc-code#readme",
+  "bugs": {
+    "url": "https://github.com/sbc-apps/sbc-code/issues"
+  }
 }
