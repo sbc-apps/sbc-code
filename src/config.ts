@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ModelProvider, DEFAULT_OLLAMA_URL } from './modelProviders';
+import { effectiveProvider } from './providerSelection';
 
 export interface SbcSettings {
   baseUrl: string;
@@ -17,7 +18,7 @@ export function readSettings(): SbcSettings {
   const config = vscode.workspace.getConfiguration('sbcCode');
   return {
     baseUrl: config.get<string>('baseUrl', 'http://127.0.0.1:8000/v1'),
-    provider: config.get<ModelProvider>('provider', 'colibri') === 'ollama' ? 'ollama' : 'colibri',
+    provider: effectiveProvider(config.get<ModelProvider>('provider', 'colibri')),
     ollamaBaseUrl: config.get<string>('ollamaBaseUrl', DEFAULT_OLLAMA_URL),
     ollamaModel: config.get<string>('ollamaModel', '').trim(),
     model: config.get<string>('model', '').trim(),

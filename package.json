@@ -2,7 +2,7 @@
   "name": "sbc-code",
   "displayName": "SBC Code",
   "description": "Local-first coding agent for VS Code with Colibri and Ollama providers, tool calling and safe edits.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "publisher": "sbc-apps",
   "license": "UNLICENSED",
   "private": true,
@@ -201,7 +201,7 @@
             "Colibri or another OpenAI-compatible server",
             "Ollama local model server"
           ],
-          "description": "AI inference provider used for Chat, Agent, edits and inline code completions."
+          "description": "Default AI inference provider. The sidebar selector persists its choice in VS Code extension storage without writing User Settings; manual Settings changes are supported."
         },
         "sbcCode.ollamaBaseUrl": {
           "type": "string",
