@@ -4,7 +4,7 @@
 
 **Local-first AI coding agent for VS Code**, built by SBC. Works with [Colibri](https://github.com/JustVugg/colibri), [Ollama](https://ollama.com/), and compatible local AI servers.
 
-> **Status:** 0.7.1 development build with a fix for Ollama provider switching in VS Code.
+> **Status:** 0.8.0 experimental coding agent. Files are changed only by approved workspace-edit tools; generated prose is never evidence of a saved file.
 
 ## Logo
 
@@ -41,6 +41,18 @@ The sidebar **Provider** choice is saved in VS Code extension storage (not writt
 ```
 
 Use the **Refresh Models** action after pulling a new Ollama model. Switching providers clears the current in-memory chat history to avoid mixing contexts from different backends. Existing explicit file-edit approvals, diffs, rollback and workspace protections remain in force.
+
+## How to create a real file (instead of just generating code)
+
+1. Open a **local folder** in VS Code via **File → Open Folder** and trust the workspace. SBC Code displays the active workspace folder above chat, or an **Open Folder** button if none is ready.
+2. Keep **Agent mode** enabled in the SBC Code composer (now selected by default). The ordinary Chat mode answers questions but **cannot create or edit files**.
+3. Ask the agent to `Create index.html in the workspace root with a calculator`. The model must call the `propose_edits` tool with the new file contents.
+4. Open the proposed Diff and click **Approve File**. SBC Code applies the change in the open workspace using VS Code's WorkspaceEdit API.
+5. Check the **Files changed by SBC Code** receipt. It reports **Created: index.html** or **Modified: ...** only when the file-editing tool returned a successful apply result.
+
+If the answer includes HTML but the status says **No files created or modified**, the model only wrote chat text, or the file proposal was rejected or failed. The file does **not** exist as a result of that chat message. The status comes from actual tool execution, not model-written claims like "I found a file". This is particularly important when using a local model without working tool-call support.
+
+The receipt is per request; it summarizes the latest prompt rather than indexing your repository. Existing Diff approval, workspace path restrictions and undo checkpoints still apply.
 
 ## Features
 

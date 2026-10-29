@@ -89,3 +89,14 @@ textarea {
 .attachment-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; padding: 4px 5px; font-size: 11px; }
 .attachment-chip > button { background: transparent; border: 0; font-size: 14px; padding: 1px 5px; }
 .attachment-chip > button:hover { background: var(--vscode-toolbar-hoverBackground); }
+
+/* Evidence-based workspace and file-write status. Model prose never controls these labels. */
+.workspace-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 12px 9px; font-size: 11px; color: var(--vscode-descriptionForeground); }
+.workspace-status.ready { color: var(--vscode-foreground); }
+.workspace-status.missing { color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground)); }
+.open-folder { font-size: 11px; padding: 3px 8px; }
+.write-report { border-left: 2px solid var(--vscode-panel-border); margin: 0 0 9px; padding: 6px 9px; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.write-report strong { display: block; font-weight: 600; margin-bottom: 3px; }
+.write-report div { margin: 2px 0; }
+.write-report.changed { border-color: var(--vscode-testing-iconPassed, var(--vscode-focusBorder)); }
+.write-report.unchanged { border-color: var(--vscode-editorWarning-foreground, var(--vscode-panel-border)); }

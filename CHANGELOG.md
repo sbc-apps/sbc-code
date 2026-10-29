@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0 — verified Agent file operations
+
+- Enable Agent mode by default for new SBC Code conversations. Chat mode remains available for read-only questions.
+- Show the actual trusted workspace folder, or **Open Folder** when no local folder is selected.
+- Provide per-request **Created / Modified / No files changed** receipts derived only from approved, successful WorkspaceEdit tool responses.
+- Report denied or failed edit attempts instead of taking the language model's "file created" claims at face value.
+- Reinforce the Agent's tool instructions to use propose_edits to create files and never confuse generated HTML with saved files.
+- Add regression tests for execution-evidence-driven write receipts.
+
+
 ## 0.7.1 — provider settings registration compatibility
 
 - Fix the "sbcCode.provider is not a registered configuration" failure when switching model providers.

@@ -14,6 +14,8 @@
   const send = document.getElementById('send');
   const stop = document.getElementById('stop');
   const attachedFiles = document.getElementById('attachments');
+  const workspace = document.getElementById('workspace');
+  const writeReport = document.getElementById('write-report');
 
   let busy = false;
   let pendingSubmit = false;
@@ -180,6 +182,55 @@
     attachedFiles.hidden = files.length === 0;
   }
 
+  function showWorkspace(data) {
+    workspace.replaceChildren();
+    const label = document.createElement('span');
+    if (data.ready) {
+      label.textContent = 'Workspace: ' + String(data.name || 'Folder');
+      workspace.className = 'workspace-status ready';
+    } else {
+      label.textContent = 'Workspace not ready: ' + String(data.name || 'No folder');
+      workspace.className = 'workspace-status missing';
+      const openButton = document.createElement('button');
+      openButton.type = 'button';
+      openButton.className = 'open-folder';
+      openButton.textContent = 'Open Folder';
+      openButton.addEventListener('click', function () { post('openFolder'); });
+      workspace.appendChild(label);
+      workspace.appendChild(openButton);
+      return;
+    }
+    workspace.appendChild(label);
+  }
+
+  function showWriteReport(data) {
+    writeReport.replaceChildren();
+    const created = Array.isArray(data.created) ? data.created.filter((x) => typeof x === 'string') : [];
+    const modified = Array.isArray(data.modified) ? data.modified.filter((x) => typeof x === 'string') : [];
+    const attempted = Number.isInteger(data.attempted) ? data.attempted : 0;
+    const changed = created.length + modified.length > 0;
+    writeReport.className = changed ? 'write-report changed' : 'write-report unchanged';
+    const heading = document.createElement('strong');
+    heading.textContent = changed ? 'Files changed by SBC Code:' : 'No files created or modified';
+    writeReport.appendChild(heading);
+    for (const [label, names] of [['Created',created],['Modified',modified]]) {
+      for (const name of names) {
+        const line = document.createElement('div');
+        line.textContent = label + ': ' + name;
+        writeReport.appendChild(line);
+      }
+    }
+    if (!changed) {
+      const reason = document.createElement('div');
+      reason.textContent = data.mode === 'Chat'
+        ? 'Chat only generates text. Enable Agent mode to create files after approval.'
+        : attempted > 0
+          ? 'No file writes were confirmed. A proposal may have been declined or failed.'
+          : 'The model did not use a successful file-editing tool. Text output is not a saved file.';
+      writeReport.appendChild(reason);
+    }
+  }
+
   function sendPrompt() {
     const text = prompt.value.trim();
     if (!text || busy || pendingSubmit) {
@@ -256,6 +307,12 @@
           showAttachments(data.files.filter((entry) => typeof entry === 'string'));
         }
         break;
+      case 'workspace':
+        showWorkspace(data);
+        break;
+      case 'writeReport':
+        showWriteReport(data);
+        break;
       case 'status':
         status.textContent = data.message || '';
         break;
@@ -296,6 +353,7 @@
         break;
       case 'cleared':
         messages.replaceChildren();
+        showWriteReport({ created: [], modified: [], mode: 'Chat' });
         currentAssistant = null;
         pendingSubmit = false;
         updateBusy(false);
