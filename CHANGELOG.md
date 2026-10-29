@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0 — autonomous, verified on-disk source editing
+
+- Automatically apply and save workspace file edits in trusted local projects by default; no repeated Approve File prompts.
+- Preserve optional manual Diff review via `sbcCode.agentEditMode: "review"`.
+- Save new and modified files to disk and verify their contents before emitting Created / Modified receipts.
+- Support creating files in new nested directories, while retaining workspace/symlink/secret restrictions.
+- Add a constrained single-file generation fallback for smaller Ollama models that output complete source without tool calls.
+- Make Edit Selection save automatically and persist Undo restores to disk.
+- Keep terminal/test command execution permission-gated and checkpoints available for rollback.
+
+
 ## 0.8.0 — verified Agent file operations
 
 - Enable Agent mode by default for new SBC Code conversations. Chat mode remains available for read-only questions.

@@ -10,6 +10,8 @@ import { getWorkspaceDiagnostics } from './diagnostics';
 import { diagnosticsForAgent, summarizeDiagnostics } from './diagnosticContext';
 import { ModelProvider } from './modelProviders';
 import { PROVIDER_STATE_KEY, selectProvider } from './providerSelection';
+import { resolveWorkspaceFile } from './workspacePaths';
+import { promises as fs } from 'node:fs';
 
 const SYSTEM_PROMPT = [
   'You are SBC Code, a local-first programming assistant.',
@@ -81,6 +83,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.post({ type: 'models', models: this.models, selected: this.getModel(), provider: readSettings().provider });
     this.post({ type: 'attachments', files: this.fileAttachments.list() });
     this.post({ type: 'workspace', ...this.workspaceStatus() });
+    this.post({ type: 'editPolicy', mode: vscode.workspace.getConfiguration('sbcCode').get<string>('agentEditMode', 'automatic') });
     void this.refreshModels();
   }
 
@@ -196,6 +199,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'ready':
         this.post({ type: 'models', models: this.models, selected: this.getModel(), provider: readSettings().provider });
         this.post({ type: 'workspace', ...this.workspaceStatus() });
+        this.post({ type: 'editPolicy', mode: vscode.workspace.getConfiguration('sbcCode').get<string>('agentEditMode', 'automatic') });
         break;
       case 'send':
         if (typeof input.prompt === 'string') {
@@ -216,6 +220,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.post({ type: 'attachments', files: this.fileAttachments.list() });
         }
         break;
+      case 'openFile': {
+        if (typeof input.path !== 'string' || input.path.length > 400 || !this.workspaceStatus().ready) {
+          throw new Error('Open a trusted workspace before opening a changed file.');
+        }
+        const root = vscode.workspace.workspaceFolders![0].uri.fsPath;
+        const filename = await resolveWorkspaceFile(root, input.path, false);
+        const stats = await fs.stat(filename);
+        if (!stats.isFile()) throw new Error('The requested file is not available.');
+        await vscode.window.showTextDocument(vscode.Uri.file(filename), { preview: false });
+        break;
+      }
       case 'openFolder': {
         const selected = await vscode.window.showOpenDialog({
           title: 'SBC Code: Select Workspace Folder',
@@ -456,6 +471,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       '<button id="attach-files" class="attach-files" type="button" title="Attach up to 3 local code files">+ File</button>',
       '</div>',
       '<div id="attachments" class="attachments" aria-live="polite" hidden></div>',
+      '<div id="edit-policy" class="edit-policy" role="status">Automatic workspace edits enabled</div>',
       '<div id="write-report" class="write-report" role="status">No files have been changed in this conversation.</div>',
       '<textarea id="prompt" rows="3" maxlength="12000" aria-label="Message" placeholder="Ask SBC Code to build, explain or fix…"></textarea>',
       '<div class="composer-actions"><span class="hint">Enter to send · Shift+Enter for newline</span>',

@@ -15,6 +15,8 @@ test('agent paths stay inside workspace, including symlinks', async () => {
     await symlink(other, path.join(root, 'external'), 'dir');
     assert.equal(await resolveWorkspaceFile(root, 'src/index.ts', false), path.join(root, 'src', 'index.ts'));
     assert.equal(await resolveWorkspaceFile(root, 'src/new.ts', true), path.join(root, 'src', 'new.ts'));
+    assert.equal(await resolveWorkspaceFile(root, 'src/nested/new-file.ts', true), path.join(root, 'src', 'nested', 'new-file.ts'));
+    await assert.rejects(resolveWorkspaceFile(root, 'src/nested/new-file.ts', false), /ENOENT/);
     await assert.rejects(resolveWorkspaceFile(root, '../outside.ts', true), /outside/);
     await assert.rejects(resolveWorkspaceFile(root, 'external/secret.ts', false), /outside/);
     await assert.rejects(resolveWorkspaceFile(root, '.env.local', true), /restricted/);

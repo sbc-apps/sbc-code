@@ -111,45 +111,40 @@ export class EditSelectionController {
     });
     this.preview.add(previewUri, previewContent);
 
-    await vscode.commands.executeCommand(
-      'vscode.diff',
-      document.uri,
-      previewUri,
-      'SBC Code: Review proposed edit — ' + basename,
-      { preview: true },
-    );
-
-    const action = await vscode.window.showInformationMessage(
-      'SBC Code: review the diff before applying this edit.',
-      'Apply Change',
-      'Discard',
-    );
-    if (action !== 'Apply Change') {
-      return;
+    const automatic = vscode.workspace.getConfiguration('sbcCode')
+      .get<string>('agentEditMode', 'automatic') === 'automatic';
+    if (!automatic) {
+      await vscode.commands.executeCommand(
+        'vscode.diff', document.uri, previewUri,
+        'SBC Code: Review proposed edit — ' + basename, {preview:true},
+      );
+      const action = await vscode.window.showInformationMessage(
+        'SBC Code: review the diff before applying this edit.',
+        'Apply Change', 'Discard',
+      );
+      if (action !== 'Apply Change') return;
     }
-    if (document.version !== snapshotVersion || document.getText(range) !== selected.text) {
-      throw new Error('The source changed during review. Edit was not applied.');
+    if (document.version !== snapshotVersion || document.getText() !== originalFullText) {
+      throw new Error('The document changed during editing. Edit was not applied.');
     }
     const workspaceEdit = new vscode.WorkspaceEdit();
     workspaceEdit.replace(document.uri, range, replacement);
     if (!await vscode.workspace.applyEdit(workspaceEdit)) {
       throw new Error('VS Code could not apply the edit.');
     }
+    // Record before save so Undo remains available if saving to disk fails.
     const checkpointSaved = this.checkpoints.record('Edit selection: ' + basename, [
-      { uri: document.uri, before: originalFullText, after: previewContent },
+      {uri:document.uri,before:originalFullText,after:previewContent},
     ]);
+    if (!await document.save()) {
+      throw new Error('VS Code applied the edit in memory but could not save the file.');
+    }
     if (checkpointSaved) {
-      const action = await vscode.window.showInformationMessage(
-        'SBC Code: edit applied. Review and save the file when ready.',
-        'Restore Last Edit',
+      void vscode.window.showInformationMessage(
+        'SBC Code: edit saved in ' + basename + '. Use Undo edit to restore it.',
       );
-      if (action === 'Restore Last Edit') {
-        await this.checkpoints.restoreLast();
-      }
     } else {
-      void vscode.window.showWarningMessage(
-        'SBC Code: edit applied, but the file exceeded the checkpoint memory limit. Use VS Code Undo to reverse it.',
-      );
+      void vscode.window.showInformationMessage('SBC Code: edit saved in ' + basename + '.');
     }
   }
 }

@@ -4,7 +4,7 @@
 
 **Local-first AI coding agent for VS Code**, built by SBC. Works with [Colibri](https://github.com/JustVugg/colibri), [Ollama](https://ollama.com/), and compatible local AI servers.
 
-> **Status:** 0.8.0 experimental coding agent. Files are changed only by approved workspace-edit tools; generated prose is never evidence of a saved file.
+> **Status:** 0.9.0 experimental autonomous coding agent with automatic file writes inside a trusted workspace and optional manual review.
 
 ## Logo
 
@@ -46,13 +46,21 @@ Use the **Refresh Models** action after pulling a new Ollama model. Switching pr
 
 1. Open a **local folder** in VS Code via **File → Open Folder** and trust the workspace. SBC Code displays the active workspace folder above chat, or an **Open Folder** button if none is ready.
 2. Keep **Agent mode** enabled in the SBC Code composer (now selected by default). The ordinary Chat mode answers questions but **cannot create or edit files**.
-3. Ask the agent to `Create index.html in the workspace root with a calculator`. The model must call the `propose_edits` tool with the new file contents.
-4. Open the proposed Diff and click **Approve File**. SBC Code applies the change in the open workspace using VS Code's WorkspaceEdit API.
-5. Check the **Files changed by SBC Code** receipt. It reports **Created: index.html** or **Modified: ...** only when the file-editing tool returned a successful apply result.
+3. Ask the agent to create a website or new file in the active workspace, for example: `Create index.html with a complete working HTML/CSS/JS calculator`.
+4. In the default **Automatic** edit mode the extension writes and saves approved-scope changes directly in the trusted workspace without requiring a click for every file. Optionally set `sbcCode.agentEditMode` to `review` in VS Code Settings if you prefer a Diff confirmation for each edit.
+5. Check the **Files changed by SBC Code** receipt. It reports **Created: index.html** or **Modified: ...** only after a successful on-disk save has been verified.
 
-If the answer includes HTML but the status says **No files created or modified**, the model only wrote chat text, or the file proposal was rejected or failed. The file does **not** exist as a result of that chat message. The status comes from actual tool execution, not model-written claims like "I found a file". This is particularly important when using a local model without working tool-call support.
+If the answer includes HTML but the status says **No files created or modified**, the model only wrote chat text, or the file proposal was rejected or failed. The file does **not** exist as a result of that chat message. For explicit single-file requests, a limited fallback asks a model without functioning tool calls for complete source text and saves it through the same guarded tool. It does not guess multi-file projects or overwrite an existing file it has not read. The status comes from actual tool execution, not model-written claims like "I found a file". This is particularly important when using a local model without working tool-call support.
 
-The receipt is per request; it summarizes the latest prompt rather than indexing your repository. Existing Diff approval, workspace path restrictions and undo checkpoints still apply.
+The receipt is per request; it summarizes the latest prompt rather than indexing your repository. Workspace trust, secure path restrictions, verified saves and undo checkpoints still apply. Set `sbcCode.agentEditMode: "review"` to require Diff approval before writing. **Terminal commands still require separate approval** even in Automatic edit mode.
+
+## Automatic edit mode
+
+SBC Code defaults to `"sbcCode.agentEditMode": "automatic"`. In a trusted local workspace the Agent can create and modify source files directly, persist them to disk, and report exactly what changed. The edit tools still check file paths, secret exclusions and stale source versions. You can switch to `"review"` mode in Settings to approve each diff instead. Both modes preserve session checkpoints for Undo.
+
+The small-model fallback supports an **explicit single-file creation request**. If a local model such as Llama 3.2 fails to issue any tool call but can generate a complete HTML document, SBC Code can write it as the requested file (or `index.html` for an explicit HTML calculator). Multi-file projects require a model that reliably supports tool calling.
+
+Source code is saved automatically; workspace scripts and terminal commands remain separately permission-gated. Automatic edits do not run builds, tests, servers or deploy anything without permission.
 
 ## Features
 

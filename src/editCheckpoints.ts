@@ -133,6 +133,26 @@ export class EditCheckpoints {
       if (!await vscode.workspace.applyEdit(edit)) {
         throw new Error('VS Code did not apply the restore operation.');
       }
+      // A restored buffer must also be persisted, otherwise Explorer and disk
+      // could disagree with the text shown by the editor.
+      for (const change of checkpoint.files) {
+        if (change.before === null) {
+          try {
+            await fs.stat(change.uri.fsPath);
+            throw new Error('The created file was not removed from disk: ' + change.uri.fsPath);
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          }
+        } else {
+          const document = await vscode.workspace.openTextDocument(change.uri);
+          if (document.getText() !== change.before || !await document.save()) {
+            throw new Error('Restore was applied but could not be saved for ' + change.uri.toString());
+          }
+          if (change.uri.scheme === 'file' && await fs.readFile(change.uri.fsPath,'utf8') !== change.before) {
+            throw new Error('Restore verification failed for ' + change.uri.fsPath);
+          }
+        }
+      }
       const index = this.history.indexOf(checkpoint);
       if (index >= 0) {
         this.history.splice(index, 1);

@@ -16,6 +16,7 @@
   const attachedFiles = document.getElementById('attachments');
   const workspace = document.getElementById('workspace');
   const writeReport = document.getElementById('write-report');
+  const editPolicy = document.getElementById('edit-policy');
 
   let busy = false;
   let pendingSubmit = false;
@@ -215,8 +216,12 @@
     writeReport.appendChild(heading);
     for (const [label, names] of [['Created',created],['Modified',modified]]) {
       for (const name of names) {
-        const line = document.createElement('div');
+        const line = document.createElement('button');
+        line.type = 'button';
+        line.className = 'changed-file-link';
         line.textContent = label + ': ' + name;
+        line.title = 'Open ' + name;
+        line.addEventListener('click', function () { post('openFile', {path:name}); });
         writeReport.appendChild(line);
       }
     }
@@ -309,6 +314,11 @@
         break;
       case 'workspace':
         showWorkspace(data);
+        break;
+      case 'editPolicy':
+        editPolicy.textContent = data.mode === 'review'
+          ? 'Manual review: confirm each edit in a diff'
+          : 'Auto edit: files saved directly to the trusted workspace';
         break;
       case 'writeReport':
         showWriteReport(data);
